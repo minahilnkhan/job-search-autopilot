@@ -1,0 +1,18 @@
+node_modules/
+dist/
+.env
+*.log
+.DS_Store
+
+# Local database
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+
+# Personal data: inventory, do-not-claim list, resumes, generated files.
+# Only the *.example files in data/private/ are committed.
+data/private/*
+!data/private/*.example*
+!data/private/README.md
+data/generated/

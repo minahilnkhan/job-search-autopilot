@@ -1,0 +1,73 @@
+@import "tailwindcss";
+
+/* Design tokens. One idea carries the UI: every verdict shows the JD text that
+   caused it, marked like a highlighter. Everything else stays quiet. */
+@theme {
+  --font-sans: "Public Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: "Source Serif 4", ui-serif, Georgia, serif;
+
+  --color-ink: #1d2433;
+  --color-ink-soft: #4a5468;
+  --color-paper: #f3f5f8;
+  --color-surface: #ffffff;
+  --color-line: #d5dbe4;
+  --color-accent: #2f4bd8;
+  --color-accent-ink: #1f35a8;
+  --color-pass: #1f7a4d;
+  --color-pass-bg: #e3f3ea;
+  --color-fail: #b42318;
+  --color-fail-bg: #fdecea;
+  --color-warn: #8a5600;
+  --color-warn-bg: #fdf3dc;
+  --color-mark: #ffe58a;
+}
+
+@layer base {
+  html {
+    background: var(--color-paper);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
+  :focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    * {
+      transition: none !important;
+      animation: none !important;
+    }
+  }
+}
+
+@layer components {
+  .field {
+    @apply w-full rounded-md border border-line bg-surface px-3 py-2 text-[15px] text-ink placeholder:text-ink-soft/60 focus:border-accent focus:outline-none;
+  }
+  .label {
+    @apply mb-1 block text-sm font-medium text-ink-soft;
+  }
+  .btn-primary,
+  .btn-quiet {
+    @apply inline-flex items-center justify-center gap-2 rounded-md px-4 py-2 text-[15px] font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50;
+  }
+  .btn-primary {
+    @apply bg-accent text-white hover:bg-accent-ink;
+  }
+  .btn-quiet {
+    @apply border border-line bg-surface text-ink hover:border-ink-soft;
+  }
+  .panel {
+    @apply rounded-lg border border-line bg-surface;
+  }
+  /* The highlighter: the exact posting words that triggered a verdict. */
+  .evidence {
+    @apply mt-1 max-w-[70ch] font-serif text-[14px] leading-relaxed text-ink-soft;
+  }
+  .evidence mark {
+    @apply rounded-sm bg-mark px-0.5 text-ink;
+    box-decoration-break: clone;
+    -webkit-box-decoration-break: clone;
+  }
+}
