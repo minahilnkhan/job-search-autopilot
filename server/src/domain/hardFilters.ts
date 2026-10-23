@@ -17,7 +17,7 @@ export type FilterInput = {
     /** Approved-or-later applications at this company in the last 30 days. */
     companyAppsLast30Days: number;
   };
-  /** True for job-board postings: non-engineering titles fail before any AI scoring. */
+  /** True for job-board postings: titles outside your target roles fail before any AI scoring. */
   requireTargetRole?: boolean;
 };
 
@@ -82,7 +82,7 @@ export function runHardFilters(input: FilterInput): FilterResult {
 
   // --- Role family (job-board postings only)
   if (input.requireTargetRole && !isTargetRole(title)) {
-    fail("off_target_role", "Not an engineering role you're targeting, so it wasn't scored.");
+    fail("off_target_role", "Not one of your target roles (FDE, solutions, deployment, applied AI, new-grad or full-stack/backend SWE), so it wasn't scored.");
   }
 
   // --- Experience / seniority

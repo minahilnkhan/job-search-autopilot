@@ -164,6 +164,7 @@ export type RunStats = {
   passedFilters: number;
   scored: number;
   scoreErrors: number;
+  skippedStale: number; // passed the filters but posted 30+ days ago, so not scored
   skippedOverCap: number;
   shortlisted: number;
   costUsd: number;

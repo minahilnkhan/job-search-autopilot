@@ -217,3 +217,36 @@ describe("account problems", () => {
     expect(next.stats?.scored).toBe(4);
   });
 });
+
+describe("cost cuts", () => {
+  it("doesn't score postings older than 30 days, and counts them", async () => {
+    const withStale: FetchBoard = async (b) => {
+      const postings = await fixtureBoards(b);
+      if (b.atsType !== "greenhouse") return postings;
+      return [...postings, { ...postings[0]!, externalId: "old1", title: "Solutions Engineer, Integrations", postedAt: "2026-08-01" }];
+    };
+    const { scorer, calls } = fakeScorer();
+    const run = await runPipeline(db, { ...deps(scorer), fetchBoard: withStale }, "manual");
+    expect(calls.map((c) => c.title)).not.toContain("Solutions Engineer, Integrations");
+    expect(run.stats).toMatchObject({ skippedStale: 1, scored: 4 });
+  });
+
+  it("re-checks the unscored backlog against the current rules before paying for anything", async () => {
+    // A posting stored under an older, looser role screen.
+    await runPipeline(db, { ...deps(), getScorer: () => ({ unavailable: "no key" }) }, "manual");
+    const gh = db.select().from(companies).where(eq(companies.name, "Acme GH")).get()!;
+    db.insert(jobs)
+      .values({
+        companyId: gh.id, title: "Data Engineer", description: "2+ years of experience.", source: "greenhouse",
+        location: "Chicago, IL", hardFilterPass: true, filterFailReasons: [], dedupeKey: "acme gh|data engineer|chicago il",
+        extractedFields: (db.select().from(jobs).where(eq(jobs.title, "Forward Deployed Engineer")).get()!).extractedFields,
+      })
+      .run();
+    const { scorer, calls } = fakeScorer();
+    await runPipeline(db, deps(scorer), "manual");
+    expect(calls.map((c) => c.title)).not.toContain("Data Engineer");
+    const de = db.select().from(jobs).where(eq(jobs.title, "Data Engineer")).get()!;
+    expect(de.hardFilterPass).toBe(false);
+    expect(de.filterFailReasons.map((r) => r.code)).toContain("off_target_role");
+  });
+});

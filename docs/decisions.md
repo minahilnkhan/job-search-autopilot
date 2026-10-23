@@ -79,8 +79,12 @@ Structured outputs (`output_config.format`) constrain the response. The SDK's zo
 - Every call is logged in `api_usage` with tokens and computed cost; an unknown model's cost is `null`, never $0.
 - Batch API (50% off) was considered and rejected for now: results can take hours, and at ~$0.001 a job the savings are cents.
 
-### Job-board postings must be engineering roles; pasted jobs needn't be
-A company board lists everything (accountants, recruiters, AEs). A deliberately loose title screen ("engineer/developer/deployment strategist", minus manager/hardware/scientist titles) drops the obvious non-fits before scoring. Off-target postings are still stored, so they're never fetched and checked again, but they're hidden from the main Jobs list. A job you paste yourself skips the screen: you already chose it.
+### Job-board postings must be target roles; pasted jobs needn't be
+A company board lists everything. The first live run fetched about 1,160 postings from 11 companies, and a loose "any engineering title" screen still let 336 through to scoring. The screen now matches the mentor prompt's target list: FDE, deployment, solutions, customer, implementation, applied AI and AI engineer titles, plus generalist, new-grad, full-stack and backend software titles. Specialty software titles outside that list (infrastructure, security, data, ML, mobile, SRE…) are excluded.
+- Off-target postings are still stored, so they're never fetched and checked again, but they're hidden from the main Jobs list.
+- Each run re-checks the unscored backlog against the current rules before scoring, so a rule change applies to jobs already in the database without anyone paying to score them.
+- A job you paste yourself skips the screen: you already chose it.
+- Postings older than 30 days aren't scored. The mentor prompt treats them as likely stale and they'd rank last anyway. A missing date is kept, since no date isn't evidence of staleness.
 
 ### The shortlist is a ranked snapshot per day
 `shortlists` stores the ranked job IDs per date, so "what did it recommend on Tuesday" has an answer. Ranking: stale (30+ days) last, then score, then freshness (≤ 7 days), then Chicago/remote, then warm contact. The per-company 30-day cap is applied while picking. Size = daily target + 3, matching the mentor prompt's "2–3 more than the target".

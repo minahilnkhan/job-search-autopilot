@@ -13,7 +13,7 @@ const VIEWS: { id: View; label: string; test: (j: JobListItem) => boolean }[] = 
   { id: "failing", label: "Failing", test: (j) => !j.hardFilterPass && j.status !== "dismissed" && !isOffTarget(j) },
   { id: "accepted", label: "Accepted", test: (j) => j.status === "shortlisted" },
   { id: "dismissed", label: "Dismissed", test: (j) => j.status === "dismissed" },
-  { id: "offTarget", label: "Not engineering", test: isOffTarget },
+  { id: "offTarget", label: "Not a target role", test: isOffTarget },
 ];
 
 const SPONSORSHIP_LABEL = { yes: "Sponsors", no: "No sponsorship", unstated: "Sponsorship not stated" } as const;
@@ -163,7 +163,7 @@ export function Jobs({ jobs, setJobs }: { jobs: JobListItem[]; setJobs: (fn: (j:
       </nav>
 
       {view === "offTarget" && (
-        <p className="text-[15px] text-ink-soft">Job-board postings that aren't engineering roles. They're kept so they aren't fetched and checked again, and are never scored.</p>
+        <p className="text-[15px] text-ink-soft">Job-board postings outside your target roles (FDE, solutions, deployment, applied AI, new-grad or full-stack/backend SWE). They're kept so they aren't checked again, and they're never scored. To score one anyway, add it on Add a job.</p>
       )}
 
       {shown.length === 0 ? (

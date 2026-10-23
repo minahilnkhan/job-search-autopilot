@@ -10,7 +10,8 @@ function runSummary(run: PipelineRun): string {
   const s = run.stats;
   const when = new Date(run.finishedAt ?? run.startedAt).toLocaleString([], { weekday: "short", hour: "numeric", minute: "2-digit" });
   if (!s) return `Last run ${when}`;
-  return `Last run ${when}: ${s.postingsSeen} postings from ${s.companies} companies, ${s.newJobs} new, ${s.scored} scored (${usd(s.costUsd)}).`;
+  const stale = s.skippedStale ? `, ${s.skippedStale} older than 30 days skipped` : "";
+  return `Last run ${when}: ${s.postingsSeen} postings from ${s.companies} companies, ${s.newJobs} new, ${s.scored} scored (${usd(s.costUsd)})${stale}.`;
 }
 
 function Entry({ e, onStatus }: { e: ShortlistEntry; onStatus: (id: number, status: "shortlisted" | "dismissed" | "new") => void }) {

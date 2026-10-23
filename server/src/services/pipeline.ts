@@ -3,14 +3,14 @@ import type { DB } from "../db/client";
 import { applications, companies, jobs, pipelineRuns, shortlists } from "../db/schema";
 import { extractFields } from "../domain/extract";
 import { dedupeKey } from "../domain/normalize";
-import { assembleScore } from "../domain/scoring";
+import { assembleScore, daysSincePosted } from "../domain/scoring";
 import { rankShortlist, type Candidate } from "../domain/shortlist";
 import type { FetchBoard, NormalizedPosting } from "../sources/types";
 import type { Scorer } from "../llm/scoreJob";
 import { ScoreError } from "../llm/scoreJob";
 import { accountProblem } from "../llm/errors";
 import { applicationHistory } from "./history";
-import { filterJob, toJob, NotFoundError } from "./jobs";
+import { filterJob, toJob, updateJob, NotFoundError } from "./jobs";
 import { getSettings, localDate } from "./settings";
 import { recordUsage } from "./usage";
 import type { Job, PipelineRun, RunStats, Settings, Shortlist } from "../../../shared/types";
@@ -166,18 +166,39 @@ export async function scoreJob(db: DB, jobId: number, scorer: Scorer, now: Date)
 }
 
 /** Unscored jobs that passed the filters, newest postings first, up to the per-run cap. */
-async function scorePending(db: DB, scorer: Scorer, max: number, now: Date) {
-  const pending = db
+/** Postings older than this aren't scored: the mentor prompt treats them as likely stale or ghost jobs. */
+export const MAX_SCORE_AGE_DAYS = 30;
+
+/**
+ * Re-check unscored job-board postings against the current rules, so a rule
+ * change (like a tighter role screen) applies to the backlog before anything
+ * is paid for. Pure code, no API calls.
+ */
+export function refilterUnscored(db: DB, now: Date): number {
+  const ids = db
     .select({ id: jobs.id })
+    .from(jobs)
+    .where(and(isNull(jobs.scoredAt), ne(jobs.source, "manual")))
+    .all();
+  for (const { id } of ids) updateJob(db, id, {}, now);
+  return ids.length;
+}
+
+async function scorePending(db: DB, scorer: Scorer, max: number, now: Date) {
+  const unscored = db
+    .select({ id: jobs.id, postedAt: jobs.postedAt })
     .from(jobs)
     .where(and(eq(jobs.hardFilterPass, true), isNull(jobs.scoredAt), ne(jobs.status, "dismissed")))
     .orderBy(desc(jobs.postedAt), desc(jobs.id))
-    .all()
-    .map((r) => r.id);
+    .all();
+  // Unknown posting dates are kept: no date isn't evidence of staleness.
+  const fresh = unscored.filter((r) => (daysSincePosted(r.postedAt, now) ?? 0) <= MAX_SCORE_AGE_DAYS);
+  const pending = fresh.map((r) => r.id);
   const batch = pending.slice(0, max);
   const out = {
     scored: 0,
     scoreErrors: 0,
+    skippedStale: unscored.length - fresh.length,
     skippedOverCap: pending.length - batch.length,
     costUsd: 0,
     firstError: null as string | null,
@@ -287,11 +308,12 @@ export async function runPipeline(db: DB, deps: PipelineDeps, trigger: PipelineR
   const notes: string[] = [];
   const stats: RunStats = {
     companies: 0, companiesFailed: 0, postingsSeen: 0, newJobs: 0, passedFilters: 0,
-    scored: 0, scoreErrors: 0, skippedOverCap: 0, shortlisted: 0, costUsd: 0,
+    scored: 0, scoreErrors: 0, skippedStale: 0, skippedOverCap: 0, shortlisted: 0, costUsd: 0,
   };
 
   try {
     Object.assign(stats, await fetchAll(db, deps, now));
+    refilterUnscored(db, now);
     if (stats.companiesFailed) notes.push(`${stats.companiesFailed} job board(s) failed; see Companies.`);
 
     const s = deps.getScorer(settings);
@@ -302,6 +324,7 @@ export async function runPipeline(db: DB, deps: PipelineDeps, trigger: PipelineR
       stats.scored = r.scored;
       stats.scoreErrors = r.scoreErrors;
       stats.skippedOverCap = r.skippedOverCap;
+      stats.skippedStale = r.skippedStale;
       stats.costUsd = r.costUsd;
       if (r.stoppedBecause) notes.push(`Scoring stopped: ${r.stoppedBecause} ${r.notAttempted} job(s) are waiting and will be scored on the next run.`);
       if (r.scoreErrors) notes.push(`${r.scoreErrors} job(s) failed to score. First error: ${r.firstError}`);

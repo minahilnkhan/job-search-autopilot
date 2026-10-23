@@ -72,12 +72,21 @@ describe("assembleScore", () => {
 describe("role family screen (job-board postings)", () => {
   it.each([
     "Forward Deployed Engineer",
+    "Forward Deployed Software Engineer, AI",
     "Solutions Engineer",
-    "Software Engineer, New Grad",
-    "Deployment Strategist",
-    "Applied AI Engineer",
-    "Full-Stack Developer",
+    "Technical Solutions Engineer",
     "Customer Engineer",
+    "Deployment Strategist",
+    "Implementation Engineer",
+    "Applied AI Engineer",
+    "AI Engineer",
+    "Software Engineer",
+    "Software Engineer, New Grad",
+    "Software Engineer II",
+    "Software Engineer, Backend",
+    "Full-Stack Engineer",
+    "Backend Engineer",
+    "Product Engineer",
   ])("keeps %s", (t) => expect(isTargetRole(t)).toBe(true));
 
   it.each([
@@ -88,5 +97,13 @@ describe("role family screen (job-board postings)", () => {
     "Engineering Manager",
     "Hardware Engineer",
     "Product Designer",
+    "Security Engineer, Cloud",
+    "Software Engineer, Infrastructure",
+    "Data Engineer",
+    "Machine Learning Engineer",
+    "Site Reliability Engineer",
+    "Software Engineer, Inference",
+    "Mobile Engineer, Android",
+    "Platform Engineer",
   ])("drops %s", (t) => expect(isTargetRole(t)).toBe(false));
 });

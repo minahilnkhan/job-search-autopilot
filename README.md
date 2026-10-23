@@ -30,7 +30,7 @@ Confirming a company's E-Verify status re-checks every job at that company.
 Every morning (7:00 Chicago by default, or **Run now**):
 
 1. **Fetch** every open posting from each company's public Greenhouse, Lever or Ashby job-board API.
-2. **Dedupe and filter** with the same Phase 1 rules. Job-board postings also have to be engineering roles, so accountant and recruiter postings never reach the AI.
+2. **Dedupe and filter** with the same Phase 1 rules. Job-board postings also have to match your target roles (FDE, solutions, deployment, implementation, applied AI, new-grad or full-stack/backend SWE), and postings older than 30 days aren't scored. On a first run, about 1,100 postings came down to roughly 300 before any AI call.
 3. **Score** what passes with Claude Haiku 5.5 against the mentor prompt's 1–10 rubric. The model judges each must-have requirement (met / partly / not, with the inventory fact as evidence), role signal, and stack match. Code does the arithmetic: requirements share → 0–4, strategic bonus from company facts, tiers, the "no sponsorship → Tier B" cap, and stale-posting flags.
 4. **Shortlist**: the daily target plus three spares, ranked by score, freshness, then Chicago/remote, with at most two per company in 30 days. You accept or dismiss each one; nothing is applied to automatically.
 
