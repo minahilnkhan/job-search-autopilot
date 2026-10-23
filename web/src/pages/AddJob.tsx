@@ -3,6 +3,7 @@ import type { ExtractedFields, Job } from "../../../shared/types";
 import { api, type FilterResult } from "../lib/api";
 import { FieldsEditor } from "../components/FieldsEditor";
 import { ReasonList, VerdictBadge } from "../components/Verdict";
+import { ScoreBadge, ScoreBreakdownView } from "../components/Score";
 
 type Posting = { companyName: string; title: string; location: string; url: string; postedAt: string; description: string };
 const EMPTY: Posting = { companyName: "", title: "", location: "", url: "", postedAt: "", description: "" };
@@ -12,6 +13,7 @@ export function AddJob({ onSaved }: { onSaved: () => void }) {
   const [fields, setFields] = useState<ExtractedFields | null>(null);
   const [preview, setPreview] = useState<FilterResult | null>(null);
   const [saved, setSaved] = useState<{ job: Job; duplicate: boolean } | null>(null);
+  const [scoring, setScoring] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -94,9 +96,39 @@ export function AddJob({ onSaved }: { onSaved: () => void }) {
             <VerdictBadge pass={job.hardFilterPass} reasons={job.filterReasons} />
           </div>
           <ReasonList reasons={job.filterReasons} />
+          {job.scoreBreakdown && (
+            <div className="border-t border-line pt-5">
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+                <p className="font-semibold">{job.scoreBreakdown.whyFits}</p>
+                <ScoreBadge score={job.fitScore} tier={job.tier} />
+              </div>
+              <ScoreBreakdownView b={job.scoreBreakdown} redFlags={job.redFlags} />
+            </div>
+          )}
         </article>
-        <div className="flex gap-3">
-          <button className="btn-primary" onClick={reset}>
+        {error && <p className="text-[15px] text-fail">{error}</p>}
+        <div className="flex flex-wrap gap-3">
+          {job.hardFilterPass && !job.scoreBreakdown && (
+            <button
+              className="btn-primary"
+              disabled={scoring}
+              onClick={async () => {
+                setScoring(true);
+                setError(null);
+                try {
+                  setSaved({ duplicate, job: await api.scoreJob(job.id) });
+                  onSaved();
+                } catch (err) {
+                  setError((err as Error).message);
+                } finally {
+                  setScoring(false);
+                }
+              }}
+            >
+              {scoring ? "Scoring…" : "Score now"}
+            </button>
+          )}
+          <button className={job.hardFilterPass && !job.scoreBreakdown ? "btn-quiet" : "btn-primary"} onClick={reset}>
             Add another job
           </button>
           <a className="btn-quiet" href="#/jobs">

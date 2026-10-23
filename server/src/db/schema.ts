@@ -11,8 +11,11 @@ import {
 import type {
   ExtractedFields,
   FilterReason,
+  RunStats,
+  ScoreBreakdown,
   Settings,
 } from "../../../shared/types";
+import { DEFAULT_SETTINGS } from "../domain/settingsDefaults";
 
 // Conventions:
 // - Timestamps are integer milliseconds (timestamp_ms); calendar dates are 'YYYY-MM-DD' text.
@@ -37,6 +40,9 @@ export const companies = sqliteTable(
     tags: text("tags", { mode: "json" }).$type<string[]>().notNull().default([]),
     warmContact: integer("warm_contact", { mode: "boolean" }).notNull().default(false),
     notes: text("notes"),
+    // Phase 2: result of the last job-board fetch, e.g. "ok: 121 postings" or the error.
+    atsLastCheckedAt: integer("ats_last_checked_at", { mode: "timestamp_ms" }),
+    atsLastStatus: text("ats_last_status"),
     createdAt: createdAt(),
   },
   // Case-insensitive uniqueness: "Anthropic" and "anthropic" are one company.
@@ -57,7 +63,9 @@ export const jobs = sqliteTable(
     postedAt: text("posted_at"),
     fetchedAt: integer("fetched_at", { mode: "timestamp_ms" }),
     description: text("description").notNull(),
-    source: text("source").notNull().default("manual"),
+    source: text("source").notNull().default("manual"), // manual | greenhouse | lever | ashby
+    externalId: text("external_id"), // the job board's own id for the posting
+    lastSeenAt: integer("last_seen_at", { mode: "timestamp_ms" }), // last run that still saw it open
     yearsRequired: integer("years_required"),
     sponsorshipStated: text("sponsorship_stated", { enum: ["yes", "no", "unstated"] })
       .notNull()
@@ -71,7 +79,8 @@ export const jobs = sqliteTable(
     // Not in the original spec: the reviewed extraction (flags + evidence) the filters ran on.
     extractedFields: text("extracted_fields", { mode: "json" }).$type<ExtractedFields>().notNull(),
     fitScore: integer("fit_score"),
-    scoreBreakdown: text("score_breakdown", { mode: "json" }).$type<Record<string, unknown>>(),
+    scoreBreakdown: text("score_breakdown", { mode: "json" }).$type<ScoreBreakdown>(),
+    scoredAt: integer("scored_at", { mode: "timestamp_ms" }),
     tier: text("tier", { enum: ["A", "B", "skip"] }), // null until scored (Phase 2)
     redFlags: text("red_flags", { mode: "json" }).$type<string[]>(),
     status: text("status", { enum: ["new", "shortlisted", "dismissed"] })
@@ -210,4 +219,48 @@ export const settings = sqliteTable("settings", {
     .$type<Settings["locationPrefs"]>()
     .notNull(),
   models: text("models", { mode: "json" }).$type<Settings["models"]>().notNull(),
+  pipeline: text("pipeline", { mode: "json" })
+    .$type<Settings["pipeline"]>()
+    .notNull()
+    .default(DEFAULT_SETTINGS.pipeline),
 });
+
+// ---- Phase 2 -----------------------------------------------------------------
+
+export const pipelineRuns = sqliteTable("pipeline_runs", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  trigger: text("trigger", { enum: ["schedule", "catch_up", "manual"] }).notNull(),
+  startedAt: integer("started_at", { mode: "timestamp_ms" }).notNull(),
+  finishedAt: integer("finished_at", { mode: "timestamp_ms" }),
+  status: text("status", { enum: ["running", "ok", "partial", "failed"] }).notNull().default("running"),
+  stats: text("stats", { mode: "json" }).$type<RunStats>(),
+  message: text("message"), // why a run was partial or failed, in plain words
+});
+
+// The ranked list a run produced for one day. One row per date; a later run
+// that day replaces it.
+export const shortlists = sqliteTable("shortlists", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  date: text("date").notNull().unique(), // YYYY-MM-DD in the configured timezone
+  runId: integer("run_id").references(() => pipelineRuns.id),
+  jobIds: text("job_ids", { mode: "json" }).$type<number[]>().notNull(),
+  createdAt: createdAt(),
+});
+
+// One row per Anthropic API call, for the monthly spend on the dashboard.
+export const apiUsage = sqliteTable(
+  "api_usage",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    at: integer("at", { mode: "timestamp_ms" }).notNull(),
+    purpose: text("purpose").notNull(), // "scoring" now; "tailoring", "check_in" later
+    model: text("model").notNull(),
+    inputTokens: integer("input_tokens").notNull(),
+    outputTokens: integer("output_tokens").notNull(),
+    cacheWriteTokens: integer("cache_write_tokens").notNull().default(0),
+    cacheReadTokens: integer("cache_read_tokens").notNull().default(0),
+    costUsd: real("cost_usd"), // null if the model isn't in the price table
+    jobId: integer("job_id").references(() => jobs.id),
+  },
+  (t) => [index("api_usage_at_idx").on(t.at)]
+);

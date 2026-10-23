@@ -105,8 +105,36 @@ export function Settings() {
       </fieldset>
 
       <fieldset className="panel space-y-4 p-5">
+        <legend className="px-1 text-lg font-semibold">Daily run</legend>
+        <p className="text-[15px] text-ink-soft">
+          Fetches your companies' job boards, scores new jobs, and builds Today's picks. It runs while the app is open; if your
+          laptop was asleep at that time, it catches up when the app starts.
+        </p>
+        <label className="flex items-center gap-2.5 text-[15px]">
+          <input type="checkbox" className="h-4 w-4 accent-accent" checked={s.pipeline.enabled}
+            onChange={(e) => setS({ ...s, pipeline: { ...s.pipeline, enabled: e.target.checked } })} />
+          Run every day
+        </label>
+        <div className="grid gap-4 sm:grid-cols-3">
+          <div>
+            <label className="label">Time</label>
+            <input type="time" className="field" value={s.pipeline.dailyTime}
+              onChange={(e) => setS({ ...s, pipeline: { ...s.pipeline, dailyTime: e.target.value } })} />
+          </div>
+          <div>
+            <label className="label">Time zone</label>
+            <input className="field" value={s.pipeline.timezone}
+              onChange={(e) => setS({ ...s, pipeline: { ...s.pipeline, timezone: e.target.value } })} />
+          </div>
+          <NumberField label="Most jobs to score per run" value={s.pipeline.maxScoresPerRun}
+            onChange={(n) => setS({ ...s, pipeline: { ...s.pipeline, maxScoresPerRun: n } })} />
+        </div>
+        <p className="text-sm text-ink-soft">Scoring costs about $0.001 per job, so 150 is about $0.15 per run at most.</p>
+      </fieldset>
+
+      <fieldset className="panel space-y-4 p-5">
         <legend className="px-1 text-lg font-semibold">AI models</legend>
-        <p className="text-[15px] text-ink-soft">Used from Phase 2. A smaller model scores in bulk; a larger one writes.</p>
+        <p className="text-[15px] text-ink-soft">A smaller model scores in bulk; a larger one writes (from Phase 3).</p>
         <div className="grid gap-4 sm:grid-cols-3">
           {(["scoring", "tailoring", "checkIns"] as const).map((k) => (
             <div key={k}>

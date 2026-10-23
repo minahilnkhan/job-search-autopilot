@@ -1,0 +1,24 @@
+{
+  "jobs": [
+    {
+      "id": 4012345,
+      "title": "Forward Deployed Engineer",
+      "absolute_url": "https://job-boards.greenhouse.io/acme/jobs/4012345",
+      "location": { "name": "San Francisco, CA | New York City, NY" },
+      "first_published": "2026-10-19T11:17:24-04:00",
+      "updated_at": "2026-10-20T09:00:00-04:00",
+      "content": "&lt;div&gt;&lt;h2&gt;About the role&lt;/h2&gt;&lt;p&gt;Work with customers to deploy LLM systems.&lt;/p&gt;&lt;ul&gt;&lt;li&gt;2+ years of software engineering experience&lt;/li&gt;&lt;li&gt;Python &amp;amp; TypeScript&lt;/li&gt;&lt;/ul&gt;&lt;/div&gt;",
+      "departments": [{ "id": 1, "name": "Applied AI", "child_ids": [], "parent_id": null }],
+      "offices": [],
+      "metadata": []
+    },
+    {
+      "id": 4012346,
+      "title": "Account Executive - Enterprise",
+      "absolute_url": "https://job-boards.greenhouse.io/acme/jobs/4012346",
+      "location": { "name": "Remote - US" },
+      "first_published": "2026-10-01T10:00:00-04:00",
+      "content": "&lt;p&gt;Close deals.&lt;/p&gt;"
+    }
+  ]
+}

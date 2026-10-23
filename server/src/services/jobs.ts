@@ -10,10 +10,11 @@ import type {
   CreateJobResponse,
   ExtractedFields,
   Job,
+  JobListItem,
   JobStatus,
 } from "../../../shared/types";
 
-type JobRow = typeof jobs.$inferSelect;
+export type JobRow = typeof jobs.$inferSelect;
 type CompanyRow = typeof companies.$inferSelect;
 
 export class ConflictError extends Error {}
@@ -37,7 +38,11 @@ function toJob(row: JobRow, companyName: string): Job {
     filterReasons: row.filterFailReasons,
     extractedFields: row.extractedFields,
     fitScore: row.fitScore,
+    scoreBreakdown: row.scoreBreakdown ?? null,
+    redFlags: row.redFlags ?? [],
     tier: row.tier,
+    scoredAt: row.scoredAt?.getTime() ?? null,
+    externalId: row.externalId,
     status: row.status,
     createdAt: row.createdAt.getTime(),
   };
@@ -54,9 +59,17 @@ export function findOrCreateCompany(db: DB, name: string): CompanyRow {
   return db.insert(companies).values({ name: clean }).returning().get();
 }
 
-function filterJob(
+export function filterJob(
   db: DB,
-  args: { company: CompanyRow; title: string; location: string | null; fields: ExtractedFields; jobId?: number; now: Date }
+  args: {
+    company: CompanyRow;
+    title: string;
+    location: string | null;
+    fields: ExtractedFields;
+    source: string;
+    jobId?: number;
+    now: Date;
+  }
 ) {
   const history = applicationHistory(db, {
     companyId: args.company.id,
@@ -70,8 +83,11 @@ function filterJob(
     fields: args.fields,
     company: { eVerify: args.company.eVerify },
     history,
+    requireTargetRole: args.source !== "manual",
   });
 }
+
+export { toJob };
 
 export function getJob(db: DB, id: number): Job {
   const row = db
@@ -84,14 +100,23 @@ export function getJob(db: DB, id: number): Job {
   return toJob(row.job, row.companyName);
 }
 
-export function listJobs(db: DB): Job[] {
+/**
+ * List view: no descriptions (the UI loads one when you expand a job), and
+ * job-board postings screened out as off-target are left out unless asked for,
+ * since a single company board can hold hundreds of them.
+ */
+export function listJobs(db: DB, opts: { includeOffTarget?: boolean } = {}): JobListItem[] {
   return db
     .select({ job: jobs, companyName: companies.name })
     .from(jobs)
     .innerJoin(companies, eq(jobs.companyId, companies.id))
     .orderBy(desc(jobs.createdAt), desc(jobs.id))
     .all()
-    .map((r) => toJob(r.job, r.companyName));
+    .map((r) => {
+      const { description: _d, ...rest } = toJob(r.job, r.companyName);
+      return rest;
+    })
+    .filter((j) => opts.includeOffTarget || !j.filterReasons.some((r) => r.code === "off_target_role"));
 }
 
 /** Manual paste: dedupe → hard filters → insert. */
@@ -104,7 +129,7 @@ export function createJob(db: DB, req: CreateJobRequest, now = new Date()): Crea
   if (dup) return { duplicate: true, job: getJob(db, dup.id) };
 
   const fields = req.fields ?? extractFields({ title: req.title, location, description: req.description });
-  const result = filterJob(db, { company, title: req.title, location, fields, now });
+  const result = filterJob(db, { company, title: req.title, location, fields, source: "manual", now });
 
   const inserted = db
     .insert(jobs)
@@ -153,7 +178,7 @@ export function updateJob(db: DB, id: number, patch: JobPatch, now = new Date())
     if (clash) throw new ConflictError(`That would duplicate job ${clash.id}`);
   }
 
-  const result = filterJob(db, { company, title, location, fields, jobId: id, now });
+  const result = filterJob(db, { company, title, location, fields, source: current.source, jobId: id, now });
   db.update(jobs)
     .set({
       title,

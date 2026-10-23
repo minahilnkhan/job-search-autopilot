@@ -1,19 +1,10 @@
 import type { FastifyInstance } from "fastify";
-import { eq } from "drizzle-orm";
 import type { DB } from "../db/client";
 import { settings } from "../db/schema";
-import { DEFAULT_SETTINGS } from "../domain/settingsDefaults";
+import { getSettings } from "../services/settings";
 import { settingsBody } from "./validation";
-import type { Settings } from "../../../shared/types";
 
-export function getSettings(db: DB): Settings {
-  const row = db.select().from(settings).where(eq(settings.id, 1)).get();
-  if (!row) return DEFAULT_SETTINGS;
-  const { id: _id, ...rest } = row;
-  return rest;
-}
-
-export function settingsRoutes(app: FastifyInstance, db: DB) {
+export function settingsRoutes(app: FastifyInstance, db: DB, onChange?: () => void) {
   app.get("/api/settings", async () => getSettings(db));
 
   app.put("/api/settings", async (req) => {
@@ -22,6 +13,7 @@ export function settingsRoutes(app: FastifyInstance, db: DB) {
       .values({ id: 1, ...body })
       .onConflictDoUpdate({ target: settings.id, set: body })
       .run();
+    onChange?.(); // e.g. reschedule the daily run if its time changed
     return getSettings(db);
   });
 }

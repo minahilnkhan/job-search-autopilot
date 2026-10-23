@@ -10,17 +10,25 @@
     "db:seed": "tsx --env-file-if-exists=../.env src/db/seed.ts",
     "test": "vitest run",
     "test:watch": "vitest",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "pipeline": "tsx --env-file-if-exists=../.env src/cli/runPipeline.ts",
+    "db:studio": "drizzle-kit studio"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^1.1.0",
     "better-sqlite3": "^12.4.1",
     "csv-parse": "^7.0.3",
     "drizzle-orm": "^0.45.4",
     "fastify": "^5.6.2",
+    "he": "^1.2.0",
+    "html-to-text": "^10.0.1",
+    "node-cron": "^4.6.0",
     "zod": "^4.1.12"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.13",
+    "@types/he": "^1.2.3",
+    "@types/html-to-text": "^9.0.4",
     "@types/node": "^22.18.0",
     "drizzle-kit": "^0.31.5",
     "tsx": "^4.20.6",

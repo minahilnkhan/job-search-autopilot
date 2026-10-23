@@ -21,4 +21,12 @@ export const DEFAULT_SETTINGS: Settings = {
     tailoring: "claude-sonnet-5-5",
     checkIns: "claude-sonnet-5-5",
   },
+  pipeline: {
+    enabled: true,
+    dailyTime: "07:00",
+    timezone: "America/Chicago",
+    // Upper bound on AI scoring calls per run, so a first run over hundreds of
+    // postings can't surprise you on cost.
+    maxScoresPerRun: 150,
+  },
 };

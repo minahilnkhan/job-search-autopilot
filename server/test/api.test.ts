@@ -1,11 +1,11 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { buildApp } from "../src/app";
 import { DEFAULT_SETTINGS } from "../src/domain/settingsDefaults";
-import { FDE_JD, makeTestDb } from "./helpers";
+import { FDE_JD, makeTestDb, OFFLINE_PIPELINE } from "./helpers";
 
 let app: ReturnType<typeof buildApp>;
 beforeEach(() => {
-  app = buildApp(makeTestDb());
+  app = buildApp(makeTestDb(), { pipeline: OFFLINE_PIPELINE });
 });
 
 const post = (url: string, payload: unknown) => app.inject({ method: "POST", url, payload: payload as object });
@@ -98,5 +98,39 @@ describe("settings", () => {
 
     const over = { ...DEFAULT_SETTINGS, targets: { ...DEFAULT_SETTINGS.targets, hoursPerWeekCap: 20 } };
     expect((await app.inject({ method: "PUT", url: "/api/settings", payload: over })).statusCode).toBe(400);
+  });
+});
+
+describe("pipeline routes", () => {
+  it("starts a run in the background, reports it, and serves the shortlist", async () => {
+    const res = await app.inject({ method: "POST", url: "/api/pipeline/run" });
+    expect(res.statusCode).toBe(202);
+    // Offline deps finish almost immediately; poll like the UI does.
+    let runs = (await app.inject({ method: "GET", url: "/api/pipeline/runs" })).json();
+    for (let i = 0; i < 20 && runs.running; i++) {
+      await new Promise((r) => setTimeout(r, 10));
+      runs = (await app.inject({ method: "GET", url: "/api/pipeline/runs" })).json();
+    }
+    expect(runs.runs[0]).toMatchObject({ trigger: "manual", status: "partial", message: expect.stringContaining("Scoring skipped") });
+    const shortlist = (await app.inject({ method: "GET", url: "/api/shortlist" })).json();
+    expect(shortlist.entries).toEqual([]);
+  });
+
+  it("'Score now' explains why it can't score instead of failing silently", async () => {
+    const { job } = (await post("/api/jobs", { companyName: "Acme AI", title: "FDE", location: "Chicago, IL", description: FDE_JD })).json();
+    const res = await post(`/api/jobs/${job.id}/score`, {});
+    expect(res.statusCode).toBe(409);
+    expect(res.json().error).toContain("offline test");
+  });
+
+  it("reports this month's spend", async () => {
+    expect((await app.inject({ method: "GET", url: "/api/usage/month" })).json()).toMatchObject({ calls: 0, costUsd: 0 });
+  });
+
+  it("validates the schedule settings", async () => {
+    const bad = { ...DEFAULT_SETTINGS, pipeline: { ...DEFAULT_SETTINGS.pipeline, dailyTime: "7am", timezone: "Mars/Olympus" } };
+    const res = await app.inject({ method: "PUT", url: "/api/settings", payload: bad });
+    expect(res.statusCode).toBe(400);
+    expect(res.json().issues.map((i: { path: string }) => i.path).sort()).toEqual(["pipeline.dailyTime", "pipeline.timezone"]);
   });
 });

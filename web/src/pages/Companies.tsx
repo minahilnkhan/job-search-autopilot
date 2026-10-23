@@ -8,6 +8,7 @@ type Draft = {
   atsType: AtsType | "";
   atsBoardToken: string;
   tags: string;
+  h1bHistory: string;
   warmContact: boolean;
   notes: string;
 };
@@ -18,6 +19,7 @@ const toDraft = (c?: Company): Draft => ({
   atsType: c?.atsType ?? "",
   atsBoardToken: c?.atsBoardToken ?? "",
   tags: c?.tags.join(", ") ?? "",
+  h1bHistory: c?.h1bHistory?.toString() ?? "",
   warmContact: c?.warmContact ?? false,
   notes: c?.notes ?? "",
 });
@@ -28,6 +30,7 @@ const fromDraft = (d: Draft) => ({
   atsType: d.atsType || null,
   atsBoardToken: d.atsBoardToken.trim() || null,
   tags: d.tags.split(",").map((t) => t.trim()).filter(Boolean),
+  h1bHistory: d.h1bHistory.trim() === "" ? null : Number(d.h1bHistory),
   warmContact: d.warmContact,
   notes: d.notes.trim() || null,
 });
@@ -85,6 +88,10 @@ function CompanyForm({ initial, submitLabel, onSubmit, onCancel }: {
           <input className="field" placeholder="ai-native, ed-tech" value={d.tags} onChange={set("tags")} />
         </div>
         <div>
+          <label className="label">Past H-1B filings</label>
+          <input className="field" type="number" min={0} placeholder="Unknown" value={d.h1bHistory} onChange={set("h1bHistory")} />
+        </div>
+        <div className="sm:col-span-2">
           <label className="label">Notes</label>
           <input className="field" value={d.notes} onChange={set("notes")} />
         </div>
@@ -166,6 +173,13 @@ export function Companies({ onJobsChanged }: { onJobsChanged: () => void }) {
                   <p className="text-[15px] text-ink-soft">
                     {[c.atsType ? `${c.atsType}${c.atsBoardToken ? `: ${c.atsBoardToken}` : ""}` : "No job board set", ...c.tags].join(", ")}
                   </p>
+                  {c.atsLastStatus && (
+                    <p className={`text-sm ${c.atsLastStatus.startsWith("failed") ? "text-fail" : "text-ink-soft"}`}>
+                      Job board {c.atsLastStatus.startsWith("failed") ? "check failed" : "checked"}
+                      {c.atsLastCheckedAt ? ` ${new Date(c.atsLastCheckedAt).toLocaleDateString([], { month: "short", day: "numeric" })}` : ""}
+                      : {c.atsLastStatus.replace(/^(ok|failed): /, "")}
+                    </p>
+                  )}
                   {c.notes && <p className="text-sm text-ink-soft">{c.notes}</p>}
                 </div>
                 <div className="flex items-center gap-2">

@@ -53,6 +53,8 @@ export type Company = {
   tags: string[];
   warmContact: boolean;
   notes: string | null;
+  atsLastCheckedAt: string | null; // ISO; when the job board was last fetched
+  atsLastStatus: string | null; // e.g. "ok: 121 postings" or the fetch error
 };
 
 export type Job = {
@@ -72,10 +74,17 @@ export type Job = {
   filterReasons: FilterReason[];
   extractedFields: ExtractedFields;
   fitScore: number | null;
+  scoreBreakdown: ScoreBreakdown | null;
+  redFlags: string[];
   tier: Tier | null;
+  scoredAt: number | null;
+  externalId: string | null;
   status: JobStatus;
   createdAt: number;
 };
+
+/** GET /api/jobs leaves out descriptions; GET /api/jobs/:id has the full job. */
+export type JobListItem = Omit<Job, "description">;
 
 /** Body for POST /api/jobs/extract */
 export type ExtractRequest = {
@@ -113,4 +122,62 @@ export type Settings = {
   };
   locationPrefs: { preferred: string[]; openToRelocation: boolean };
   models: { scoring: string; tailoring: string; checkIns: string };
+  pipeline: {
+    enabled: boolean;
+    dailyTime: string; // "HH:MM", 24-hour
+    timezone: string; // IANA, e.g. "America/Chicago"
+    maxScoresPerRun: number;
+  };
 };
+
+// ---- Phase 2: scoring and shortlist -----------------------------------------
+
+export type RequirementCheck = {
+  requirement: string;
+  met: "yes" | "partial" | "no";
+  /** The inventory fact that shows it's met. A "yes" without one is downgraded to "partial". */
+  evidence: string;
+};
+
+/** Mentor-prompt rubric. The AI fills in the judgments; code does the arithmetic. */
+export type ScoreBreakdown = {
+  requirements: RequirementCheck[];
+  requirementsMatch: number; // 0–4, computed from requirements
+  roleSignal: number; // 0–2
+  roleSignalReason: string;
+  stackMatch: number; // 0–2
+  stackMatchReason: string;
+  strategicBonus: number; // 0–2, computed from company facts
+  strategicReasons: string[];
+  total: number; // 1–10
+  tierCap: string | null; // why the tier was capped, e.g. no sponsorship
+  whyFits: string;
+  gaps: string[];
+  model: string;
+};
+
+export type RunStats = {
+  companies: number;
+  companiesFailed: number;
+  postingsSeen: number;
+  newJobs: number;
+  passedFilters: number;
+  scored: number;
+  scoreErrors: number;
+  skippedOverCap: number;
+  shortlisted: number;
+  costUsd: number;
+};
+
+export type PipelineRun = {
+  id: number;
+  trigger: "schedule" | "catch_up" | "manual";
+  startedAt: number;
+  finishedAt: number | null;
+  status: "running" | "ok" | "partial" | "failed";
+  stats: RunStats | null;
+  message: string | null;
+};
+
+export type ShortlistEntry = { rank: number; job: Job; eVerify: EVerify; warmContact: boolean };
+export type Shortlist = { date: string; run: PipelineRun | null; entries: ShortlistEntry[] };

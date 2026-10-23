@@ -15,7 +15,9 @@
     "typecheck": "npm run typecheck -w server && npm run typecheck -w web",
     "db:migrate": "npm run db:migrate -w server",
     "db:seed": "npm run db:seed -w server",
-    "setup": "npm run db:migrate && npm run db:seed"
+    "setup": "npm run db:migrate && npm run db:seed",
+    "pipeline": "npm run pipeline -w server",
+    "db:studio": "npm run db:studio -w server"
   },
   "devDependencies": {
     "concurrently": "^9.2.1"

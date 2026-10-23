@@ -1,13 +1,13 @@
 name,website,ats_type,ats_board_token,tags,notes
-Anthropic,https://www.anthropic.com,greenhouse,anthropic,ai-native,ATS token unverified (Phase 2 checks it)
-OpenAI,https://openai.com,ashby,openai,ai-native,ATS token unverified (Phase 2 checks it)
-Scale AI,https://scale.com,greenhouse,scaleai,ai-native;fde-team,ATS token unverified (Phase 2 checks it)
-Palantir,https://www.palantir.com,lever,palantir,fde-team;gov-tech,ATS token unverified (Phase 2 checks it); many roles need clearance
-Ramp,https://ramp.com,ashby,ramp,ai-integrated,ATS token unverified (Phase 2 checks it)
-Glean,https://www.glean.com,greenhouse,gleanwork,ai-native,ATS token unverified (Phase 2 checks it)
-Harvey,https://www.harvey.ai,ashby,harvey,ai-native;legal-tech,ATS token unverified (Phase 2 checks it)
-Sierra,https://sierra.ai,ashby,sierra,ai-native;fde-team,ATS token unverified (Phase 2 checks it)
-Decagon,https://decagon.ai,ashby,decagon,ai-native;fde-team,ATS token unverified (Phase 2 checks it)
-Duolingo,https://www.duolingo.com,greenhouse,duolingo,ed-tech;language-learning,ATS token unverified (Phase 2 checks it)
-Vercel,https://vercel.com,greenhouse,vercel,ai-integrated,ATS token unverified (Phase 2 checks it)
-Retool,https://retool.com,ashby,retool,ai-integrated,ATS token unverified (Phase 2 checks it)
+Anthropic,https://www.anthropic.com,greenhouse,anthropic,ai-native,
+OpenAI,https://openai.com,ashby,openai,ai-native,
+Scale AI,https://scale.com,greenhouse,scaleai,ai-native;fde-team,
+Palantir,https://www.palantir.com,lever,palantir,fde-team;gov-tech,Many roles need a clearance
+Ramp,https://ramp.com,ashby,ramp,ai-integrated,
+Glean,https://www.glean.com,greenhouse,gleanwork,ai-native,
+Harvey,https://www.harvey.ai,ashby,harvey,ai-native;legal-tech,
+Sierra,https://sierra.ai,ashby,sierra,ai-native;fde-team,
+Decagon,https://decagon.ai,ashby,decagon,ai-native;fde-team,
+Duolingo,https://www.duolingo.com,greenhouse,duolingo,ed-tech;language-learning,
+Vercel,https://vercel.com,greenhouse,vercel,ai-integrated,
+Retool,https://retool.com,,,ai-integrated,Job board unknown: set it on the Companies page

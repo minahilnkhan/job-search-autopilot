@@ -1,13 +1,15 @@
 import { useCallback, useEffect, useState } from "react";
-import type { Job } from "../../shared/types";
+import type { JobListItem } from "../../shared/types";
 import { api } from "./lib/api";
 import { AddJob } from "./pages/AddJob";
+import { Today } from "./pages/Today";
 import { Jobs } from "./pages/Jobs";
 import { Companies } from "./pages/Companies";
 import { Settings } from "./pages/Settings";
 
 // Hash routing: four pages don't need a router dependency.
 const ROUTES = [
+  { path: "#/today", label: "Today" },
   { path: "#/add", label: "Add a job" },
   { path: "#/jobs", label: "Jobs" },
   { path: "#/companies", label: "Companies" },
@@ -16,7 +18,7 @@ const ROUTES = [
 type Path = (typeof ROUTES)[number]["path"];
 
 function useHashRoute(): Path {
-  const read = () => (ROUTES.some((r) => r.path === location.hash) ? (location.hash as Path) : "#/add");
+  const read = () => (ROUTES.some((r) => r.path === location.hash) ? (location.hash as Path) : "#/today");
   const [route, setRoute] = useState<Path>(read);
   useEffect(() => {
     const onHash = () => {
@@ -31,7 +33,7 @@ function useHashRoute(): Path {
 
 export default function App() {
   const route = useHashRoute();
-  const [jobs, setJobs] = useState<Job[]>([]);
+  const [jobs, setJobs] = useState<JobListItem[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
 
   const loadJobs = useCallback(() => {
@@ -71,6 +73,7 @@ export default function App() {
 
       <main className="px-4 py-6 sm:px-6 lg:px-10 lg:py-10">
         {loadError && <p className="mb-6 rounded-md bg-fail-bg px-3 py-2 text-[15px] text-fail" role="alert">{loadError}</p>}
+        {route === "#/today" && <Today onJobsChanged={loadJobs} />}
         {route === "#/add" && <AddJob onSaved={loadJobs} />}
         {route === "#/jobs" && <Jobs jobs={jobs} setJobs={setJobs} />}
         {route === "#/companies" && <Companies onJobsChanged={loadJobs} />}

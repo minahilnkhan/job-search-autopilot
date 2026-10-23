@@ -43,7 +43,10 @@ export function jobRoutes(app: FastifyInstance, db: DB) {
     return result;
   });
 
-  app.get("/api/jobs", async () => listJobs(db));
+  app.get("/api/jobs", async (req) => {
+    const q = req.query as { includeOffTarget?: string };
+    return listJobs(db, { includeOffTarget: q.includeOffTarget === "1" });
+  });
 
   app.get("/api/jobs/:id", async (req) => getJob(db, idParam.parse(req.params).id));
 

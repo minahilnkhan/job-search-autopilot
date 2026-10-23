@@ -10,4 +10,6 @@ export const config = {
   databasePath: path.resolve(ROOT, process.env.DATABASE_PATH ?? "data/autopilot.db"),
   migrationsFolder: path.resolve(ROOT, "server/drizzle"),
   companySeedCsv: path.resolve(ROOT, "data/companies.seed.csv"),
+  privateDir: path.resolve(ROOT, "data/private"),
+  anthropicApiKey: process.env.ANTHROPIC_API_KEY?.trim() || null,
 };

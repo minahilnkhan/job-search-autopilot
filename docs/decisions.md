@@ -57,3 +57,39 @@ Setting E-Verify to "confirmed" re-runs the filters on every job at that company
 - Work-authorization answers are fixed settings ("Authorized: Yes", "Sponsorship now or future: Yes"), never generated.
 - The server binds to 127.0.0.1. It has no auth, so it must not be reachable from the network.
 - `data/private/` (inventory, DO NOT CLAIM list, resumes) and `.env` are gitignored.
+
+## Phase 2
+
+### The AI judges; code counts
+The model returns per-requirement judgments (met / partial / not, with the inventory fact as evidence), a role-signal score, a stack-match score with reasons, and red flags. Code turns those into the 1–10 total:
+- **Requirements match (0–4)** = 4 × share met, with partial worth half. It's computed from the per-requirement list, so the number is auditable line by line.
+- **A "met" with no evidence is downgraded to "partial".** This is the scoring-side half of the no-fabrication rule; Phase 3's Truth Check is the resume-side half.
+- **Strategic bonus (0–2)** comes from company facts (tags, H-1B history, warm contact). They're facts in the database, so asking a model about them would only add a way to be wrong.
+- Tiers, the "no sponsorship → B" cap, and stale-posting flags are code.
+- **Rejected:** asking the model for the final score. It isn't reproducible, can't be explained, and drifts between runs.
+
+### Hand-written JSON Schema, validated on return
+Structured outputs (`output_config.format`) constrain the response. The SDK's zod helper turned the `met` enum into a description, which would leave it unconstrained, so the schema is written by hand and the response is validated with zod (case-insensitive enums, as the docs advise). Numeric ranges aren't allowed in the schema; the integer fields use `enum: [0, 1, 2]` and code clamps anyway. Refusals and `max_tokens` stops are errors, never parsed.
+
+### Cost controls
+- Haiku 5.5 for scoring ($0.10 / $0.50 per million tokens in/out). Sonnet is reserved for tailoring and check-ins.
+- The mentor prompt plus inventory is one cached system prefix. The first call in a run writes the cache **alone**, then 4 calls run in parallel reading it, so they don't each pay to write it.
+- Cheap filters run first: dedupe, hard filters, and the engineering-title screen happen before any paid call.
+- A per-run cap (150 by default) bounds the worst case.
+- Every call is logged in `api_usage` with tokens and computed cost; an unknown model's cost is `null`, never $0.
+- Batch API (50% off) was considered and rejected for now: results can take hours, and at ~$0.001 a job the savings are cents.
+
+### Job-board postings must be engineering roles; pasted jobs needn't be
+A company board lists everything (accountants, recruiters, AEs). A deliberately loose title screen ("engineer/developer/deployment strategist", minus manager/hardware/scientist titles) drops the obvious non-fits before scoring. Off-target postings are still stored, so they're never fetched and checked again, but they're hidden from the main Jobs list. A job you paste yourself skips the screen: you already chose it.
+
+### The shortlist is a ranked snapshot per day
+`shortlists` stores the ranked job IDs per date, so "what did it recommend on Tuesday" has an answer. Ranking: stale (30+ days) last, then score, then freshness (≤ 7 days), then Chicago/remote, then warm contact. The per-company 30-day cap is applied while picking. Size = daily target + 3, matching the mentor prompt's "2–3 more than the target".
+
+### Scheduling: node-cron in the server, plus catch-up
+It's a local app, so the job runs inside the server process. When the laptop is asleep at 7:00, the next start notices that no run completed today and runs once. Failed runs don't count as completed, so they retry on the next start. There's an in-process lock so two runs can't overlap. **Rejected:** OS-level cron or launchd. It's more setup on your machine, and it can't see the in-app lock.
+
+### Public job-board APIs only
+Greenhouse (`boards-api.greenhouse.io`), Lever (`api.lever.co/v0/postings`), and Ashby (`api.ashbyhq.com/posting-api`) publish these endpoints for exactly this use. One company at a time, with a 20-second timeout and an honest User-Agent. Each company records its last fetch result, so a broken board token is visible on the Companies page. Board tokens for the seed list were checked against live responses; 11 of 12 worked.
+
+### Prompt injection
+Job descriptions are untrusted text. They go inside `<job_posting>` tags with an instruction to treat them as data. Even if a posting fooled the model, the damage is limited: the model can't change the filters, the tier math, or anything outside its own judgment fields.

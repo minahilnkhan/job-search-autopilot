@@ -4,13 +4,18 @@ import type { DB } from "./db/client";
 import { jobRoutes } from "./routes/jobs";
 import { companyRoutes } from "./routes/companies";
 import { settingsRoutes } from "./routes/settings";
+import { pipelineRoutes } from "./routes/pipeline";
 import { ConflictError, NotFoundError } from "./services/jobs";
+import type { PipelineDeps } from "./services/pipeline";
 
 /**
  * Builds the app around a given DB. Tests pass an in-memory DB and call
  * app.inject(), so route tests run without a port or a file on disk.
  */
-export function buildApp(db: DB, opts: { logger?: boolean } = {}) {
+export function buildApp(
+  db: DB,
+  opts: { logger?: boolean; pipeline: PipelineDeps; onSettingsChanged?: () => void }
+) {
   const app = Fastify({ logger: opts.logger ?? false, bodyLimit: 1024 * 1024 });
 
   app.setErrorHandler((err, _req, reply) => {
@@ -29,6 +34,7 @@ export function buildApp(db: DB, opts: { logger?: boolean } = {}) {
   app.get("/api/health", async () => ({ ok: true }));
   jobRoutes(app, db);
   companyRoutes(app, db);
-  settingsRoutes(app, db);
+  settingsRoutes(app, db, opts.onSettingsChanged);
+  pipelineRoutes(app, db, opts.pipeline);
   return app;
 }

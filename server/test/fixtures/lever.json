@@ -1,0 +1,26 @@
+[
+  {
+    "id": "a1b2c3",
+    "text": "Software Engineer, New Grad",
+    "hostedUrl": "https://jobs.lever.co/acme/a1b2c3",
+    "applyUrl": "https://jobs.lever.co/acme/a1b2c3/apply",
+    "createdAt": 1792500000000,
+    "workplaceType": "remote",
+    "country": "US",
+    "categories": { "commitment": "Full-time", "location": "Remote - United States", "team": "Engineering", "allLocations": ["Remote - United States", "Chicago, IL"] },
+    "descriptionPlain": "Build product features end to end.\n",
+    "lists": [{ "text": "Requirements", "content": "<li>0-2 years of experience</li><li>JavaScript or TypeScript</li>" }],
+    "additionalPlain": "We participate in E-Verify."
+  },
+  {
+    "id": "d4e5f6",
+    "text": "Software Engineer (Contract)",
+    "hostedUrl": "https://jobs.lever.co/acme/d4e5f6",
+    "createdAt": 1792500000000,
+    "workplaceType": "onsite",
+    "categories": { "commitment": "Contract", "location": "Washington, D.C." },
+    "descriptionPlain": "Six month engagement.",
+    "lists": [],
+    "additionalPlain": ""
+  }
+]

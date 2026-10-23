@@ -6,7 +6,10 @@ import type {
   ExtractedFields,
   FilterReason,
   Job,
+  JobListItem,
+  PipelineRun,
   Settings,
+  Shortlist,
 } from "../../../shared/types";
 
 export class ApiError extends Error {
@@ -41,7 +44,9 @@ export const api = {
   preview: (body: { companyName: string; title: string; location?: string; fields: ExtractedFields }) =>
     request<FilterResult>("POST", "/api/jobs/preview", body),
   createJob: (body: CreateJobRequest) => request<CreateJobResponse>("POST", "/api/jobs", body),
-  listJobs: () => request<Job[]>("GET", "/api/jobs"),
+  listJobs: (includeOffTarget = false) => request<JobListItem[]>("GET", `/api/jobs${includeOffTarget ? "?includeOffTarget=1" : ""}`),
+  getJob: (id: number) => request<Job>("GET", `/api/jobs/${id}`),
+  scoreJob: (id: number) => request<Job>("POST", `/api/jobs/${id}/score`, {}),
   updateJob: (id: number, body: Partial<Pick<Job, "title" | "location" | "url" | "status">> & { fields?: ExtractedFields }) =>
     request<Job>("PATCH", `/api/jobs/${id}`, body),
   listCompanies: () => request<Company[]>("GET", "/api/companies"),
@@ -50,6 +55,12 @@ export const api = {
     request<{ company: Company; refilteredJobs: number }>("PATCH", `/api/companies/${id}`, body),
   getSettings: () => request<Settings>("GET", "/api/settings"),
   saveSettings: (body: Settings) => request<Settings>("PUT", "/api/settings", body),
+  runPipeline: () => request<{ started: boolean }>("POST", "/api/pipeline/run", {}),
+  listRuns: () => request<{ running: boolean; runs: PipelineRun[] }>("GET", "/api/pipeline/runs"),
+  getShortlist: () => request<Shortlist | null>("GET", "/api/shortlist"),
+  monthSpend: () => request<{ month: string; calls: number; costUsd: number; unpricedCalls: number }>("GET", "/api/usage/month"),
 };
+
+export const usd = (n: number) => (n < 0.01 && n > 0 ? "<$0.01" : `$${n.toFixed(2)}`);
 
 export const E_VERIFY_SEARCH_URL = "https://www.e-verify.gov/e-verify-employer-search";

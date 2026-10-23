@@ -97,6 +97,19 @@ export const settingsBody = z.object({
     tailoring: z.string().trim().min(1),
     checkIns: z.string().trim().min(1),
   }),
+  pipeline: z.object({
+    enabled: z.boolean(),
+    dailyTime: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Use 24-hour HH:MM"),
+    timezone: z.string().refine((tz) => {
+      try {
+        new Intl.DateTimeFormat("en-US", { timeZone: tz });
+        return true;
+      } catch {
+        return false;
+      }
+    }, "Unknown timezone (use a name like America/Chicago)"),
+    maxScoresPerRun: z.number().int().min(0).max(1000),
+  }),
 }).refine(
   (s) => s.targets.bucketHours.applications + s.targets.bucketHours.projects + s.targets.bucketHours.prep <= s.targets.hoursPerWeekCap,
   { message: "Bucket hours add up to more than the weekly cap", path: ["targets", "bucketHours"] }

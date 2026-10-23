@@ -1,4 +1,5 @@
 import type { EVerify, ExtractedFields, FilterReason } from "../../../shared/types";
+import { isTargetRole } from "./roleFamily";
 
 // Hard filters from job-mentor-prompt.md, as pure functions. No DB, no LLM,
 // no clock: the caller passes in everything, so every rule is unit-testable.
@@ -16,6 +17,8 @@ export type FilterInput = {
     /** Approved-or-later applications at this company in the last 30 days. */
     companyAppsLast30Days: number;
   };
+  /** True for job-board postings: non-engineering titles fail before any AI scoring. */
+  requireTargetRole?: boolean;
 };
 
 export type FilterResult = { pass: boolean; reasons: FilterReason[] };
@@ -76,6 +79,11 @@ export function runHardFilters(input: FilterInput): FilterResult {
     reasons.push({ code, severity: "fail", message, evidence: evidenceKey ? f.evidence[evidenceKey] : undefined });
   const warn = (code: string, message: string, evidenceKey?: string) =>
     reasons.push({ code, severity: "warn", message, evidence: evidenceKey ? f.evidence[evidenceKey] : undefined });
+
+  // --- Role family (job-board postings only)
+  if (input.requireTargetRole && !isTargetRole(title)) {
+    fail("off_target_role", "Not an engineering role you're targeting, so it wasn't scored.");
+  }
 
   // --- Experience / seniority
   if (f.yearsRequired === null) {
