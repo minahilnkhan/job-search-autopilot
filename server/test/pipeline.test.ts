@@ -190,3 +190,30 @@ describe("scheduler catch-up", () => {
     expect(shouldCatchUp({ ...base, timeNow: "09:15", enabled: false })).toBe(false);
   });
 });
+
+describe("account problems", () => {
+  it("stops the run on the first 'credit balance too low' error instead of trying every job", async () => {
+    const Anthropic = (await import("@anthropic-ai/sdk")).default;
+    let calls = 0;
+    const broke: PipelineDeps["getScorer"] = () => ({
+      scorer: async () => {
+        calls++;
+        throw new Anthropic.BadRequestError(
+          400,
+          { type: "error", error: { type: "invalid_request_error", message: "Your credit balance is too low to access the Anthropic API." } },
+          "Your credit balance is too low to access the Anthropic API.",
+          new Headers()
+        );
+      },
+    });
+    const run = await runPipeline(db, { ...deps(), getScorer: broke }, "manual");
+    expect(calls).toBeLessThanOrEqual(1 + 4); // the cache-warming call, plus at most one per in-flight worker
+    expect(run.status).toBe("partial");
+    expect(run.message).toContain("no credits");
+    expect(run.message).toContain("platform.claude.com/settings/billing");
+    expect(run.stats).toMatchObject({ scored: 0, scoreErrors: 0 });
+    // Nothing is lost: the jobs stay unscored and the next run picks them up.
+    const next = await runPipeline(db, deps(), "manual");
+    expect(next.stats?.scored).toBe(4);
+  });
+});

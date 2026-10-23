@@ -6,6 +6,7 @@ import { getSettings } from "../services/settings";
 import { monthSpend } from "../services/usage";
 import { ConflictError } from "../services/jobs";
 import { idParam } from "./validation";
+import { accountProblem } from "../llm/errors";
 
 export function pipelineRoutes(app: FastifyInstance, db: DB, deps: PipelineDeps) {
   // A run takes minutes (fetching boards, then scoring), so start it and
@@ -29,7 +30,12 @@ export function pipelineRoutes(app: FastifyInstance, db: DB, deps: PipelineDeps)
     const { id } = idParam.parse(req.params);
     const s = deps.getScorer(getSettings(db));
     if ("unavailable" in s) throw new ConflictError(`Can't score yet: ${s.unavailable}`);
-    await scoreJob(db, id, s.scorer, new Date());
+    try {
+      await scoreJob(db, id, s.scorer, new Date());
+    } catch (err) {
+      const fatal = accountProblem(err);
+      throw fatal ? new ConflictError(`Can't score: ${fatal}`) : err;
+    }
     return getJob(db, id);
   });
 

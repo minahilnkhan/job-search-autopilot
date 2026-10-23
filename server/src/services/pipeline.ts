@@ -8,6 +8,7 @@ import { rankShortlist, type Candidate } from "../domain/shortlist";
 import type { FetchBoard, NormalizedPosting } from "../sources/types";
 import type { Scorer } from "../llm/scoreJob";
 import { ScoreError } from "../llm/scoreJob";
+import { accountProblem } from "../llm/errors";
 import { applicationHistory } from "./history";
 import { filterJob, toJob, NotFoundError } from "./jobs";
 import { getSettings, localDate } from "./settings";
@@ -174,13 +175,29 @@ async function scorePending(db: DB, scorer: Scorer, max: number, now: Date) {
     .all()
     .map((r) => r.id);
   const batch = pending.slice(0, max);
-  const out = { scored: 0, scoreErrors: 0, skippedOverCap: pending.length - batch.length, costUsd: 0, firstError: null as string | null };
+  const out = {
+    scored: 0,
+    scoreErrors: 0,
+    skippedOverCap: pending.length - batch.length,
+    costUsd: 0,
+    firstError: null as string | null,
+    stoppedBecause: null as string | null,
+    notAttempted: 0,
+  };
 
   const scoreOne = async (id: number) => {
+    if (out.stoppedBecause) return;
     try {
       out.costUsd += (await scoreJob(db, id, scorer, now)).costUsd;
       out.scored++;
     } catch (err) {
+      // No credits / bad key fails every call the same way: stop instead of
+      // sending the rest of the batch just to collect the same error.
+      const fatal = accountProblem(err);
+      if (fatal) {
+        out.stoppedBecause ??= fatal;
+        return;
+      }
       out.scoreErrors++;
       out.firstError ??= (err as Error).message;
     }
@@ -197,6 +214,7 @@ async function scorePending(db: DB, scorer: Scorer, max: number, now: Date) {
     while (next < batch.length) await scoreOne(batch[next++]!);
   };
   await Promise.all(Array.from({ length: SCORING_CONCURRENCY }, worker));
+  out.notAttempted = batch.length - out.scored - out.scoreErrors;
   return out;
 }
 
@@ -285,6 +303,7 @@ export async function runPipeline(db: DB, deps: PipelineDeps, trigger: PipelineR
       stats.scoreErrors = r.scoreErrors;
       stats.skippedOverCap = r.skippedOverCap;
       stats.costUsd = r.costUsd;
+      if (r.stoppedBecause) notes.push(`Scoring stopped: ${r.stoppedBecause} ${r.notAttempted} job(s) are waiting and will be scored on the next run.`);
       if (r.scoreErrors) notes.push(`${r.scoreErrors} job(s) failed to score. First error: ${r.firstError}`);
       if (r.skippedOverCap) notes.push(`${r.skippedOverCap} job(s) left for the next run (per-run scoring cap).`);
     }
