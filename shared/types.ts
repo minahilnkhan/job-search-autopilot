@@ -122,6 +122,11 @@ export type Settings = {
   };
   locationPrefs: { preferred: string[]; openToRelocation: boolean };
   models: { scoring: string; tailoring: string; checkIns: string };
+  /** What makes Today's picks. Only applies to ranking; scoring is unchanged. */
+  shortlist: {
+    minFitScore: number; // 1–10; jobs below this never make Today's picks
+    maxAgeDays: number; // postings older than this never make Today's picks
+  };
   pipeline: {
     enabled: boolean;
     dailyTime: string; // "HH:MM", 24-hour

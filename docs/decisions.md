@@ -97,3 +97,7 @@ Greenhouse (`boards-api.greenhouse.io`), Lever (`api.lever.co/v0/postings`), and
 
 ### Prompt injection
 Job descriptions are untrusted text. They go inside `<job_posting>` tags with an instruction to treat them as data. Even if a posting fooled the model, the damage is limited: the model can't change the filters, the tier math, or anything outside its own judgment fields.
+
+### Today's picks: a score floor and an age limit, not a different rubric
+Picks default to **8+ fit and posted within 14 days**, both editable in Settings. Applying early to a strong match beats applying late to a long list. These are ranking thresholds: the scoring rubric (the mentor prompt) is unchanged, so a 7 still means the same thing; it just doesn't make the daily list. Changing a threshold re-ranks today's picks from existing scores, with no new AI calls.
+Finding less competitive roles is mostly a sourcing question, not a scoring one. Famous AI labs get the most applicants for every posting, so the bigger lever is adding smaller companies in domains where the candidate's background is unusual.

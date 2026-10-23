@@ -60,3 +60,23 @@ describe("rankShortlist", () => {
     expect(rank(many, 13)).toHaveLength(13);
   });
 });
+
+describe("Today's picks thresholds", () => {
+  const opts = { size: 13, preferredLocations: [], now: NOW };
+  it("keeps only jobs at or above the minimum fit score", () => {
+    const seven = c({ fitScore: 7, companyId: 1 });
+    const eight = c({ fitScore: 8, tier: "A", companyId: 2 });
+    const nine = c({ fitScore: 9, tier: "A", companyId: 3 });
+    expect(rankShortlist([seven, eight, nine], { ...opts, minFitScore: 8 })).toEqual([nine.jobId, eight.jobId]);
+  });
+
+  it("drops postings older than the age limit but keeps unknown dates", () => {
+    const fresh = c({ postedAt: "2026-10-20", companyId: 1 });
+    const old = c({ postedAt: "2026-10-01", companyId: 2 }); // 22 days
+    const undated = c({ postedAt: null, companyId: 3 });
+    const picked = rankShortlist([fresh, old, undated], { ...opts, maxAgeDays: 14 });
+    expect(picked).toContain(fresh.jobId);
+    expect(picked).toContain(undated.jobId);
+    expect(picked).not.toContain(old.jobId);
+  });
+});

@@ -97,6 +97,10 @@ export const settingsBody = z.object({
     tailoring: z.string().trim().min(1),
     checkIns: z.string().trim().min(1),
   }),
+  shortlist: z.object({
+    minFitScore: z.number().int().min(1).max(10),
+    maxAgeDays: z.number().int().min(1).max(90),
+  }),
   pipeline: z.object({
     enabled: z.boolean(),
     dailyTime: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Use 24-hour HH:MM"),

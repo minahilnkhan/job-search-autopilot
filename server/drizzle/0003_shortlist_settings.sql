@@ -1,0 +1,1 @@
+ALTER TABLE `settings` ADD `shortlist` text DEFAULT '{"minFitScore":8,"maxAgeDays":14}' NOT NULL;

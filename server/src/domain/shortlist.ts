@@ -30,9 +30,22 @@ function preferredLocation(c: Candidate, preferred: string[]): boolean {
 
 export function rankShortlist(
   candidates: Candidate[],
-  opts: { size: number; preferredLocations: string[]; now: Date }
+  opts: {
+    size: number;
+    preferredLocations: string[];
+    now: Date;
+    /** Only jobs scoring at least this make the list (Settings → Today's picks). */
+    minFitScore?: number;
+    /** Only postings at most this many days old. Unknown dates are kept. */
+    maxAgeDays?: number;
+  }
 ): number[] {
-  const eligible = candidates.filter((c) => c.tier === "A" || c.tier === "B");
+  const eligible = candidates.filter((c) => {
+    if (c.tier !== "A" && c.tier !== "B") return false;
+    if (c.fitScore < (opts.minFitScore ?? 5)) return false;
+    const age = daysSincePosted(c.postedAt, opts.now);
+    return opts.maxAgeDays === undefined || age === null || age <= opts.maxAgeDays;
+  });
   const key = (c: Candidate) => {
     const age = daysSincePosted(c.postedAt, opts.now);
     return {

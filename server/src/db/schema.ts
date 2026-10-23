@@ -219,6 +219,10 @@ export const settings = sqliteTable("settings", {
     .$type<Settings["locationPrefs"]>()
     .notNull(),
   models: text("models", { mode: "json" }).$type<Settings["models"]>().notNull(),
+  shortlist: text("shortlist", { mode: "json" })
+    .$type<Settings["shortlist"]>()
+    .notNull()
+    .default(DEFAULT_SETTINGS.shortlist),
   pipeline: text("pipeline", { mode: "json" })
     .$type<Settings["pipeline"]>()
     .notNull()

@@ -280,3 +280,16 @@ describe("progress and stopping", () => {
     expect(listRuns(db)[0]).toMatchObject({ status: "failed", message: expect.stringContaining("Interrupted") });
   });
 });
+
+describe("changing the picks thresholds", () => {
+  it("re-ranks today's picks from existing scores without fetching or scoring", async () => {
+    const { rebuildTodaysShortlist } = await import("../src/services/pipeline");
+    const { settings } = await import("../src/db/schema");
+    await runPipeline(db, deps(), "schedule"); // scores 9, 9, 8, 8
+    expect(getShortlist(db)!.entries).toHaveLength(4);
+    const row = db.select().from(settings).get()!;
+    db.update(settings).set({ shortlist: { ...row.shortlist, minFitScore: 9 } }).run();
+    expect(rebuildTodaysShortlist(db, NOW)).toBe(2);
+    expect(getShortlist(db)!.entries.map((e) => e.job.fitScore)).toEqual([9, 9]);
+  });
+});

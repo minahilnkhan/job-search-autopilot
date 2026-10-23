@@ -287,7 +287,13 @@ export function buildShortlist(db: DB, settings: Settings, now: Date): number[] 
 
   // Daily target plus a few spares, so you can drop some (mentor prompt: 12–13).
   const size = settings.targets.appsPerDay + 3;
-  return rankShortlist(candidates, { size, preferredLocations: settings.locationPrefs.preferred, now });
+  return rankShortlist(candidates, {
+    size,
+    preferredLocations: settings.locationPrefs.preferred,
+    now,
+    minFitScore: settings.shortlist.minFitScore,
+    maxAgeDays: settings.shortlist.maxAgeDays,
+  });
 }
 
 // ---- Orchestration ------------------------------------------------------------------
@@ -395,6 +401,20 @@ export async function runPipeline(db: DB, deps: PipelineDeps, trigger: PipelineR
     running = false;
     progress = null;
   }
+}
+
+/**
+ * Re-rank today's picks from jobs already scored, e.g. after you change the
+ * minimum score or age in Settings. Free: no fetching, no AI calls.
+ */
+export function rebuildTodaysShortlist(db: DB, now = new Date()): number {
+  const settings = getSettings(db);
+  const date = localDate(now, settings.pipeline.timezone);
+  const ids = buildShortlist(db, settings, now);
+  const existing = db.select().from(shortlists).where(eq(shortlists.date, date)).get();
+  if (existing) db.update(shortlists).set({ jobIds: ids }).where(eq(shortlists.id, existing.id)).run();
+  else db.insert(shortlists).values({ date, runId: null, jobIds: ids }).run();
+  return ids.length;
 }
 
 export function listRuns(db: DB, limit = 10): PipelineRun[] {

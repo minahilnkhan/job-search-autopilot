@@ -179,7 +179,7 @@ export function Today({ onJobsChanged }: { onJobsChanged: () => void }) {
           <p className="font-medium">{list ? "No jobs made the list" : "No picks yet"}</p>
           <p className="mt-1 text-[15px] text-ink-soft">
             {list
-              ? "Nothing scored Tier A or B. Check the run message above, or add companies with job boards."
+              ? "No recent job cleared your minimum fit score. Check the run message above, add more companies on the Companies page, or adjust Today's picks in Settings."
               : "The first run happens at your scheduled time, or press Run now."}
           </p>
         </div>

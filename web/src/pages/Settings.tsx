@@ -105,6 +105,29 @@ export function Settings() {
       </fieldset>
 
       <fieldset className="panel space-y-4 p-5">
+        <legend className="px-1 text-lg font-semibold">Today's picks</legend>
+        <p className="text-[15px] text-ink-soft">
+          Which scored jobs make the daily list. Changing these re-ranks today's picks right away, with no new AI calls.
+        </p>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div>
+            <label className="label" htmlFor="minScore">Minimum fit score</label>
+            <select id="minScore" className="field" value={s.shortlist.minFitScore}
+              onChange={(e) => setS({ ...s, shortlist: { ...s.shortlist, minFitScore: Number(e.target.value) } })}>
+              {[5, 6, 7, 8, 9, 10].map((n) => (
+                <option key={n} value={n}>{n}/10{n === 5 ? " (all of Tier A and B)" : n === 8 ? " (Tier A only)" : ""}</option>
+              ))}
+            </select>
+          </div>
+          <NumberField label="Posted within (days)" value={s.shortlist.maxAgeDays}
+            onChange={(n) => setS({ ...s, shortlist: { ...s.shortlist, maxAgeDays: n } })} />
+        </div>
+        <p className="text-sm text-ink-soft">
+          A higher bar means fewer picks per day. If the list runs short, add more companies rather than lowering the bar.
+        </p>
+      </fieldset>
+
+      <fieldset className="panel space-y-4 p-5">
         <legend className="px-1 text-lg font-semibold">Daily run</legend>
         <p className="text-[15px] text-ink-soft">
           Fetches your companies' job boards, scores new jobs, and builds Today's picks. It runs while the app is open; if your
