@@ -293,6 +293,7 @@ export function buildShortlist(db: DB, settings: Settings, now: Date): number[] 
     now,
     minFitScore: settings.shortlist.minFitScore,
     maxAgeDays: settings.shortlist.maxAgeDays,
+    preferredCityBoost: settings.shortlist.preferredCityBoost,
   });
 }
 

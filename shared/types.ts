@@ -126,6 +126,7 @@ export type Settings = {
   shortlist: {
     minFitScore: number; // 1–10; jobs below this never make Today's picks
     maxAgeDays: number; // postings older than this never make Today's picks
+    preferredCityBoost: number; // extra ranking points for jobs in a preferred city (Chicago)
   };
   pipeline: {
     enabled: boolean;

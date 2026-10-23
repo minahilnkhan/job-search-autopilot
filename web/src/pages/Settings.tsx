@@ -121,6 +121,15 @@ export function Settings() {
           </div>
           <NumberField label="Posted within (days)" value={s.shortlist.maxAgeDays}
             onChange={(n) => setS({ ...s, shortlist: { ...s.shortlist, maxAgeDays: n } })} />
+          <div className="sm:col-span-2">
+            <label className="label" htmlFor="cityBoost">Extra weight for your preferred city ({s.locationPrefs.preferred.find((p) => !/remote/i.test(p))?.split(",")[0] ?? "none set"})</label>
+            <select id="cityBoost" className="field sm:w-1/2" value={s.shortlist.preferredCityBoost}
+              onChange={(e) => setS({ ...s, shortlist: { ...s.shortlist, preferredCityBoost: Number(e.target.value) } })}>
+              <option value={0}>None: remote and city only break ties</option>
+              <option value={1}>+1: a 7 there ranks like an 8</option>
+              <option value={2}>+2: a 6 there ranks like an 8</option>
+            </select>
+          </div>
         </div>
         <p className="text-sm text-ink-soft">
           A higher bar means fewer picks per day. If the list runs short, add more companies rather than lowering the bar.

@@ -18,10 +18,9 @@ export type Candidate = {
 
 const MAX_PER_COMPANY_30D = 2;
 
-/** Chicago or remote breaks ties (mentor prompt). */
-function preferredLocation(c: Candidate, preferred: string[]): boolean {
-  if (c.remote) return true;
-  const loc = (c.location ?? "").toLowerCase();
+/** In one of your preferred cities (Settings → Location), e.g. Chicago. */
+export function inPreferredCity(location: string | null, preferred: string[]): boolean {
+  const loc = (location ?? "").toLowerCase();
   return preferred.some((p) => {
     const city = p.split(",")[0]!.trim().toLowerCase();
     return city.length > 0 && !city.startsWith("remote") && loc.includes(city);
@@ -38,21 +37,32 @@ export function rankShortlist(
     minFitScore?: number;
     /** Only postings at most this many days old. Unknown dates are kept. */
     maxAgeDays?: number;
+    /**
+     * Extra ranking points for jobs in a preferred city. With 1, a Chicago 7
+     * clears an 8 minimum and ranks alongside other 8s. The fit score itself
+     * (and its tier) is unchanged; this only affects Today's picks.
+     */
+    preferredCityBoost?: number;
   }
 ): number[] {
+  const boost = opts.preferredCityBoost ?? 0;
+  const rankScore = (c: Candidate) => c.fitScore + (inPreferredCity(c.location, opts.preferredLocations) ? boost : 0);
   const eligible = candidates.filter((c) => {
     if (c.tier !== "A" && c.tier !== "B") return false;
-    if (c.fitScore < (opts.minFitScore ?? 5)) return false;
+    if (rankScore(c) < (opts.minFitScore ?? 5)) return false;
     const age = daysSincePosted(c.postedAt, opts.now);
     return opts.maxAgeDays === undefined || age === null || age <= opts.maxAgeDays;
   });
   const key = (c: Candidate) => {
     const age = daysSincePosted(c.postedAt, opts.now);
+    const city = inPreferredCity(c.location, opts.preferredLocations);
     return {
+      rank: rankScore(c),
+      city: city ? 1 : 0,
       score: c.fitScore,
       fresh: age !== null && age <= 7 ? 1 : 0, // prefer postings under a week old
       notStale: age === null || age <= 30 ? 1 : 0,
-      pref: preferredLocation(c, opts.preferredLocations) ? 1 : 0,
+      remote: c.remote ? 1 : 0,
       warm: c.warmContact ? 1 : 0,
       age: age ?? 9999,
     };
@@ -62,9 +72,11 @@ export function rankShortlist(
     const kb = key(b);
     return (
       kb.notStale - ka.notStale ||
+      kb.rank - ka.rank || // fit score plus the preferred-city boost
+      kb.city - ka.city || // on a tie, the preferred city wins
       kb.score - ka.score ||
       kb.fresh - ka.fresh ||
-      kb.pref - ka.pref ||
+      kb.remote - ka.remote || // then remote (mentor prompt: Chicago or remote breaks a tie)
       kb.warm - ka.warm ||
       ka.age - kb.age ||
       a.jobId - b.jobId

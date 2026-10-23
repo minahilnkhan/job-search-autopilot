@@ -8,7 +8,8 @@ export function getSettings(db: DB): Settings {
   const row = db.select().from(settings).where(eq(settings.id, 1)).get();
   if (!row) return DEFAULT_SETTINGS;
   const { id: _id, ...rest } = row;
-  return rest;
+  // Fill keys added after the row was first saved (JSON columns don't migrate per key).
+  return { ...rest, shortlist: { ...DEFAULT_SETTINGS.shortlist, ...rest.shortlist } };
 }
 
 /** YYYY-MM-DD for `now` in an IANA timezone (en-CA formats dates that way). */

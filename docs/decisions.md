@@ -101,3 +101,9 @@ Job descriptions are untrusted text. They go inside `<job_posting>` tags with an
 ### Today's picks: a score floor and an age limit, not a different rubric
 Picks default to **8+ fit and posted within 14 days**, both editable in Settings. Applying early to a strong match beats applying late to a long list. These are ranking thresholds: the scoring rubric (the mentor prompt) is unchanged, so a 7 still means the same thing; it just doesn't make the daily list. Changing a threshold re-ranks today's picks from existing scores, with no new AI calls.
 Finding less competitive roles is mostly a sourcing question, not a scoring one. Famous AI labs get the most applicants for every posting, so the bigger lever is adding smaller companies in domains where the candidate's background is unusual.
+
+### Chicago gets a ranking boost, not a scoring boost
+A job in a preferred city (Settings → Location; Chicago) gets +1 ranking point by default (0–2 in Settings). A Chicago 7 clears an 8 minimum and ranks with the 8s, and a preferred-city job wins ties. Remote still breaks ties among the rest. The fit score and tier are untouched, so "8/10" always means the same thing, whatever the location.
+
+### Company list: smaller companies in domains where the background is unusual
+22 companies added, every job-board endpoint checked against a live response (2026-10-23): Chicago-based (Sprout Social, project44, FourKites, Civis Analytics, SpotHero, LogicGate), ed-tech and language learning (Coursera, Newsela, Khan Academy, Speak, MagicSchool), legal-tech (Everlaw), gov-tech (Nava, Code for America, Polimorphic), and AI startups with deployment or solutions teams (Writer, LangChain, Abridge, Cresta, Talkdesk, Stuut, Camunda). Candidates that failed verification (wrong or private board tokens) were left out rather than guessed.

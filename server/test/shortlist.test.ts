@@ -80,3 +80,27 @@ describe("Today's picks thresholds", () => {
     expect(picked).not.toContain(old.jobId);
   });
 });
+
+describe("preferred-city (Chicago) boost", () => {
+  const opts = { size: 13, preferredLocations: ["Chicago, IL", "Remote (US)"], now: NOW, minFitScore: 8, preferredCityBoost: 1 };
+  it("lets a Chicago 7 clear an 8 minimum, while a 7 elsewhere doesn't", () => {
+    const chi7 = c({ fitScore: 7, location: "Chicago, IL", companyId: 1 });
+    const ny7 = c({ fitScore: 7, location: "New York, NY", companyId: 2 });
+    expect(rankShortlist([chi7, ny7], opts)).toEqual([chi7.jobId]);
+  });
+  it("ranks a Chicago 8 level with an out-of-town 9, and first on the tie", () => {
+    const chi8 = c({ fitScore: 8, tier: "A", location: "Chicago, IL", companyId: 1 });
+    const ny9 = c({ fitScore: 9, tier: "A", location: "New York, NY", companyId: 2 });
+    const ny8 = c({ fitScore: 8, tier: "A", location: "New York, NY", companyId: 3 });
+    expect(rankShortlist([ny8, ny9, chi8], opts)).toEqual([chi8.jobId, ny9.jobId, ny8.jobId]);
+  });
+  it("remote still breaks ties between non-Chicago jobs", () => {
+    const ny = c({ fitScore: 8, tier: "A", location: "New York, NY", companyId: 1 });
+    const remote = c({ fitScore: 8, tier: "A", location: "Remote - US", remote: true, companyId: 2 });
+    expect(rankShortlist([ny, remote], opts)[0]).toBe(remote.jobId);
+  });
+  it("boost 0 turns it off", () => {
+    const chi7 = c({ fitScore: 7, location: "Chicago, IL", companyId: 1 });
+    expect(rankShortlist([chi7], { ...opts, preferredCityBoost: 0 })).toEqual([]);
+  });
+});

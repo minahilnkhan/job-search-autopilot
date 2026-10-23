@@ -54,15 +54,15 @@ describe("Phase 2 acceptance: a run produces a ranked shortlist with score break
     expect(ae.filterFailReasons.map((r) => r.code)).toContain("off_target_role");
     expect(ae.scoredAt).toBeNull();
 
-    // Ranked: score, then freshness, then Chicago/remote.
+    // Ranked by fit score plus a 1-point Chicago boost, then Chicago on ties.
     const list = getShortlist(db)!;
     expect(list.date).toBe("2026-10-23");
     expect(list.run?.id).toBe(run.id);
     expect(list.entries.map((e) => `${e.rank}. ${e.job.title} (${e.job.fitScore})`)).toEqual([
-      "1. Forward Deployed Engineer (9)", // AI-native bonus, posted 4 days ago
-      "2. Solutions Engineer (9)", // warm-contact bonus, 8 days old
-      "3. Software Engineer, New Grad (8)", // remote / Chicago breaks the tie
-      "4. Software Engineer (Contract) (8)",
+      "1. Solutions Engineer (9)", // 9 + Chicago (secondary location) = 10
+      "2. Software Engineer, New Grad (8)", // 8 + Chicago = 9, wins the tie with the SF/NY 9
+      "3. Forward Deployed Engineer (9)", // 9, no Chicago
+      "4. Software Engineer (Contract) (8)", // Washington, D.C.
     ]);
 
     // Every entry carries its full breakdown.
@@ -289,7 +289,8 @@ describe("changing the picks thresholds", () => {
     expect(getShortlist(db)!.entries).toHaveLength(4);
     const row = db.select().from(settings).get()!;
     db.update(settings).set({ shortlist: { ...row.shortlist, minFitScore: 9 } }).run();
-    expect(rebuildTodaysShortlist(db, NOW)).toBe(2);
-    expect(getShortlist(db)!.entries.map((e) => e.job.fitScore)).toEqual([9, 9]);
+    // The two 9s, plus the Chicago 8 (boosted to 9).
+    expect(rebuildTodaysShortlist(db, NOW)).toBe(3);
+    expect(getShortlist(db)!.entries.map((e) => e.job.fitScore)).toEqual([9, 8, 9]);
   });
 });

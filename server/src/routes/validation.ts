@@ -100,6 +100,7 @@ export const settingsBody = z.object({
   shortlist: z.object({
     minFitScore: z.number().int().min(1).max(10),
     maxAgeDays: z.number().int().min(1).max(90),
+    preferredCityBoost: z.number().int().min(0).max(2),
   }),
   pipeline: z.object({
     enabled: z.boolean(),

@@ -23,7 +23,7 @@ export const DEFAULT_SETTINGS: Settings = {
   },
   // High-fit, fresh postings only: early applicants to a strong match beat
   // late applicants to a long list.
-  shortlist: { minFitScore: 8, maxAgeDays: 14 },
+  shortlist: { minFitScore: 8, maxAgeDays: 14, preferredCityBoost: 1 },
   pipeline: {
     enabled: true,
     dailyTime: "07:00",
