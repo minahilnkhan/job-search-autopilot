@@ -97,6 +97,7 @@ export const settingsBody = z.object({
     tailoring: z.string().trim().min(1),
     checkIns: z.string().trim().min(1),
   }),
+  standardAnswers: z.array(z.object({ question: z.string().trim().min(1), answer: z.string().trim() })).max(30),
   shortlist: z.object({
     minFitScore: z.number().int().min(1).max(10),
     maxAgeDays: z.number().int().min(1).max(90),

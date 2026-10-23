@@ -10,8 +10,8 @@ I'm a software engineer on STEM OPT, which narrows down which jobs I can take: t
 |---|---|---|
 | 1. Foundations | Schema, settings, company list, paste a job → deterministic hard filters | ✅ Done |
 | 2. Scoring + shortlist | Greenhouse/Lever/Ashby fetchers, AI fit scoring, tiers, daily ranked shortlist, schedule | ✅ Done |
-| 3. Prep + Truth Check | Tailored resumes, a code-level check that blocks any unverified claim, review queue | Next |
-| 4. Assisted submit | Playwright prefills the form; I review and click submit myself | |
+| 3. Prep + Truth Check | Tailored resumes, a code-level check that blocks any unverified claim, review queue | ✅ Done |
+| 4. Assisted submit | Playwright prefills the form; I review and click submit myself | Next |
 | 5. Dashboard + mentor | Progress vs targets, daily check-ins, time and API-cost tracking | |
 | 6. Polish | Demo, measured results | |
 
@@ -35,6 +35,30 @@ Every morning (7:00 Chicago by default, or **Run now**):
 4. **Shortlist**: the daily target plus three spares, ranked by score, freshness, then Chicago/remote, with at most two per company in 30 days. You accept or dismiss each one; nothing is applied to automatically.
 
 Every AI call is logged with its token counts and cost. The mentor prompt and inventory are prompt-cached, so a scored job costs about $0.001.
+
+## What Phase 3 adds
+
+**Accept and prepare** on a job builds the application:
+
+- **Tier A:** Claude Sonnet 5.5 tailors the matching base resume (FDE or SWE). It may only reword existing lines (by line id) and reorder bullets within a role: no new roles, projects or claims. It also writes a recruiter note under 100 words and answers to common questions.
+- **Tier B:** the base resume as-is, plus your standard answers. No AI call.
+- **Work-authorization answers** always come from Settings and can't be edited per application.
+
+Then the **Truth Check** runs in code over every resume line, the note and every answer:
+
+| Check | Example it blocks |
+|---|---|
+| Every number must appear in `candidate_inventory.md` (50K = 50,000; ~ and + ignored) | "used by 12 teams" when 12 isn't in the inventory |
+| Nothing on the DO NOT CLAIM list, which is parsed from the inventory into `do_not_claim.json` | "Cut latency 60%" |
+| No ownership verbs (designed, built, architected…) on work the inventory says someone else designed | "Designed the caching layer" |
+| No unfilled `[placeholders]`; recruiter note under 100 words | "[email]" |
+| Banned style words (warning only) | "leveraged" |
+
+Any failure keeps the application out of the review queue, showing the exact line, where it is and why, until you fix it or override it with a written reason. Any later edit clears the override. A PDF that's missing or longer than one page always blocks approval.
+
+The **resume** is one structure rendered two ways: Chromium prints the HTML template to PDF (page count checked with pdf-lib), and the `docx` library writes the matching DOCX. They can't drift apart.
+
+The **Review** page shows the job, its score and gaps, each resume change as before → after, a PDF preview, the note and the answers, all editable inline. Actions: **Approve** (one application at a time), **Not applying** (with a reason, kept for tuning scoring), **Snooze**.
 
 ## Architecture
 
@@ -63,10 +87,14 @@ The rule that shapes the layout: **anything that decides eligibility, or does ar
 
 ```
 server/
-  src/domain/     extract, hardFilters, roleFamily, scoring, shortlist   ← the rules, pure
+  src/domain/     extract, hardFilters, roleFamily, scoring, shortlist,
+                  inventory, truthCheck, resumeFormat, tailorPlan,
+                  applicationStatus                         ← the rules, pure
   src/sources/    Greenhouse / Lever / Ashby fetchers → one posting shape
-  src/llm/        scoring prompt + JSON schema, pricing, mentor-context loader
-  src/services/   jobs, history (30-day window), pipeline, usage (cost log)
+  src/llm/        scoring + tailoring prompts and JSON schemas, pricing, mentor-context loader
+  src/render/     resume HTML template → PDF (Chromium), DOCX (docx)
+  src/services/   jobs, history (30-day window), pipeline, usage (cost log),
+                  resumes, applications (prep + review), truth
   src/scheduler.ts  daily cron + catch-up after sleep
   src/routes/     HTTP + zod validation
   src/db/         schema.ts, migrations, idempotent seed
@@ -97,6 +125,14 @@ Open http://localhost:5173.
 
 Without the key or these files, runs still fetch and filter, and the run message says what's missing.
 
+**For resumes (Phase 3+)**, one-time:
+
+```bash
+npm run setup:pdf   # downloads the Chromium build used to print resume PDFs
+```
+
+Then put your base resumes in `data/private/resume_fde.md` and `resume_swe.md` (imported on first start), or paste them on the **Resumes** page.
+
 Other commands:
 
 ```bash
@@ -122,6 +158,11 @@ The short version is below. [`docs/decisions.md`](docs/decisions.md) has the rea
 - **Secrets only in `.env`; personal data only in `data/private/`.** Both are gitignored.
 
 ## Known limitations
+
+Phase 3:
+- The Truth Check verifies numbers, listed false claims and ownership words. It can't judge every qualitative overstatement ("the same loop as customer feedback"), which is why every changed line is shown before → after for your review.
+- The DOCX mirrors the PDF's layout, but Word can wrap slightly differently. The one-page check runs on the PDF.
+- Phrases are matched literally, so a reworded DO NOT CLAIM item without its number can slip through. Add sharper patterns in `do_not_claim.extra.json`.
 
 Phase 2:
 - The schedule fires only while the app is running. If your laptop is asleep at run time, the next start catches up.

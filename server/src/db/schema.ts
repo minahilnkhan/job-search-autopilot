@@ -9,7 +9,11 @@ import {
   type AnySQLiteColumn,
 } from "drizzle-orm/sqlite-core";
 import type {
+  Answer,
   ExtractedFields,
+  ResumeChange,
+  ResumeContent,
+  TruthReport,
   FilterReason,
   RunStats,
   ScoreBreakdown,
@@ -119,12 +123,19 @@ export const applications = sqliteTable(
     tier: text("tier", { enum: ["A", "B"] }),
     resumeVersionId: integer("resume_version_id").references(() => resumeVersions.id),
     recruiterNote: text("recruiter_note"),
-    answers: text("answers", { mode: "json" }).$type<Record<string, string>>(),
+    answers: text("answers", { mode: "json" }).$type<Answer[]>(),
     status: text("status", { enum: APPLICATION_STATUSES }).notNull().default("draft"),
     approvedAt: integer("approved_at", { mode: "timestamp_ms" }),
     submittedAt: integer("submitted_at", { mode: "timestamp_ms" }),
     followUpDue: text("follow_up_due"),
     lastActivityAt: integer("last_activity_at", { mode: "timestamp_ms" }),
+    // Phase 3
+    truthReport: text("truth_report", { mode: "json" }).$type<TruthReport>(),
+    truthOverride: text("truth_override", { mode: "json" }).$type<{ reason: string; at: number }>(),
+    reviewReason: text("review_reason"), // why you rejected it in review
+    snoozedUntil: text("snoozed_until"), // YYYY-MM-DD
+    prepNotes: text("prep_notes", { mode: "json" }).$type<string[]>(),
+    tailoring: text("tailoring", { mode: "json" }).$type<{ keywordsCovered: string[]; keywordsMissing: string[]; honestGaps: string[] }>(),
     createdAt: createdAt(),
   },
   (t) => [index("applications_job_idx").on(t.jobId)]
@@ -135,10 +146,8 @@ export const resumeVersions = sqliteTable("resume_versions", {
   baseType: text("base_type", { enum: ["fde", "swe"] }).notNull(),
   parentId: integer("parent_id").references((): AnySQLiteColumn => resumeVersions.id),
   jobId: integer("job_id").references(() => jobs.id),
-  content: text("content", { mode: "json" })
-    .$type<{ sections: { title: string; bullets: string[] }[] }>()
-    .notNull(),
-  diffFromBase: text("diff_from_base", { mode: "json" }).$type<unknown>(),
+  content: text("content", { mode: "json" }).$type<ResumeContent>().notNull(),
+  diffFromBase: text("diff_from_base", { mode: "json" }).$type<ResumeChange[]>(),
   truthCheckStatus: text("truth_check_status", {
     enum: ["pending", "pass", "fail", "overridden"],
   })
@@ -146,6 +155,8 @@ export const resumeVersions = sqliteTable("resume_versions", {
     .default("pending"),
   filePathDocx: text("file_path_docx"),
   filePathPdf: text("file_path_pdf"),
+  pdfPages: integer("pdf_pages"),
+  truthReport: text("truth_report", { mode: "json" }).$type<TruthReport>(),
   createdAt: createdAt(),
 });
 
@@ -227,6 +238,10 @@ export const settings = sqliteTable("settings", {
     .$type<Settings["pipeline"]>()
     .notNull()
     .default(DEFAULT_SETTINGS.pipeline),
+  standardAnswers: text("standard_answers", { mode: "json" })
+    .$type<Settings["standardAnswers"]>()
+    .notNull()
+    .default(DEFAULT_SETTINGS.standardAnswers),
 });
 
 // ---- Phase 2 -----------------------------------------------------------------

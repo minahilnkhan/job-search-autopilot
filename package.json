@@ -17,7 +17,8 @@
     "db:seed": "npm run db:seed -w server",
     "setup": "npm run db:migrate && npm run db:seed",
     "pipeline": "npm run pipeline -w server",
-    "db:studio": "npm run db:studio -w server"
+    "db:studio": "npm run db:studio -w server",
+    "setup:pdf": "playwright install chromium"
   },
   "devDependencies": {
     "concurrently": "^9.2.1"

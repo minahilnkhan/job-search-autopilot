@@ -21,6 +21,14 @@ export const DEFAULT_SETTINGS: Settings = {
     tailoring: "claude-sonnet-5-5",
     checkIns: "claude-sonnet-5-5",
   },
+  // Reused as-is on every application. Bracketed parts are placeholders the
+  // Truth Check won't let through until you fill them in (Settings page).
+  standardAnswers: [
+    { question: "How did you hear about this role?", answer: "Their careers page." },
+    { question: "Are you willing to relocate?", answer: "Yes, anywhere in the US." },
+    { question: "When can you start?", answer: "[your start date or notice period]" },
+    { question: "What are your salary expectations?", answer: "[your answer, or leave it open]" },
+  ],
   // High-fit, fresh postings only: early applicants to a strong match beat
   // late applicants to a long list.
   shortlist: { minFitScore: 8, maxAgeDays: 14, preferredCityBoost: 1 },

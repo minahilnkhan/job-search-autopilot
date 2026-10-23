@@ -6,19 +6,27 @@ import { Today } from "./pages/Today";
 import { Jobs } from "./pages/Jobs";
 import { Companies } from "./pages/Companies";
 import { Settings } from "./pages/Settings";
+import { Review } from "./pages/Review";
+import { Resumes } from "./pages/Resumes";
 
-// Hash routing: four pages don't need a router dependency.
+// Hash routing: a handful of pages don't need a router dependency.
 const ROUTES = [
   { path: "#/today", label: "Today" },
   { path: "#/add", label: "Add a job" },
+  { path: "#/review", label: "Review" },
   { path: "#/jobs", label: "Jobs" },
+  { path: "#/resumes", label: "Resumes" },
   { path: "#/companies", label: "Companies" },
   { path: "#/settings", label: "Settings" },
 ] as const;
 type Path = (typeof ROUTES)[number]["path"];
 
 function useHashRoute(): Path {
-  const read = () => (ROUTES.some((r) => r.path === location.hash) ? (location.hash as Path) : "#/today");
+  // "#/review?id=3" → route "#/review" (the page reads the id itself).
+  const read = () => {
+    const base = location.hash.split("?")[0];
+    return ROUTES.some((r) => r.path === base) ? (base as Path) : "#/today";
+  };
   const [route, setRoute] = useState<Path>(read);
   useEffect(() => {
     const onHash = () => {
@@ -35,6 +43,11 @@ export default function App() {
   const route = useHashRoute();
   const [jobs, setJobs] = useState<JobListItem[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [reviewCount, setReviewCount] = useState(0);
+  const loadReviewCount = useCallback(() => {
+    api.applications("review").then((a) => setReviewCount(a.length)).catch(() => {});
+  }, []);
+  useEffect(loadReviewCount, [loadReviewCount, route]);
 
   const loadJobs = useCallback(() => {
     api
@@ -66,6 +79,7 @@ export default function App() {
             >
               {r.label}
               {r.path === "#/jobs" && jobs.length > 0 && <span className="ml-1.5 text-ink-soft">{jobs.length}</span>}
+              {r.path === "#/review" && reviewCount > 0 && <span className="ml-1.5 rounded bg-accent px-1.5 text-sm text-white">{reviewCount}</span>}
             </a>
           ))}
         </nav>
@@ -75,7 +89,9 @@ export default function App() {
         {loadError && <p className="mb-6 rounded-md bg-fail-bg px-3 py-2 text-[15px] text-fail" role="alert">{loadError}</p>}
         {route === "#/today" && <Today onJobsChanged={loadJobs} />}
         {route === "#/add" && <AddJob onSaved={loadJobs} />}
+        {route === "#/review" && <Review key={location.hash} onCountsChanged={loadReviewCount} />}
         {route === "#/jobs" && <Jobs jobs={jobs} setJobs={setJobs} />}
+        {route === "#/resumes" && <Resumes />}
         {route === "#/companies" && <Companies onJobsChanged={loadJobs} />}
         {route === "#/settings" && <Settings />}
       </main>

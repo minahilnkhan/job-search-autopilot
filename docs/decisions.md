@@ -107,3 +107,29 @@ A job in a preferred city (Settings → Location; Chicago) gets +1 ranking point
 
 ### Company list: smaller companies in domains where the background is unusual
 22 companies added, every job-board endpoint checked against a live response (2026-10-23): Chicago-based (Sprout Social, project44, FourKites, Civis Analytics, SpotHero, LogicGate), ed-tech and language learning (Coursera, Newsela, Khan Academy, Speak, MagicSchool), legal-tech (Everlaw), gov-tech (Nava, Code for America, Polimorphic), and AI startups with deployment or solutions teams (Writer, LangChain, Abridge, Cresta, Talkdesk, Stuut, Camunda). Candidates that failed verification (wrong or private board tokens) were left out rather than guessed.
+
+## Phase 3
+
+### The inventory is the source of truth; the DO NOT CLAIM list is derived from it
+`candidate_inventory.md` is parsed at check time: numbers outside the DO NOT CLAIM section become the allowed set; each DO NOT CLAIM bullet becomes a rule (the numbers and quoted phrases in its first sentence); "X, Y and Z were designed by …" becomes an ownership rule. The derived rules are written to `do_not_claim.json` so you can see exactly what's enforced, and `do_not_claim.extra.json` holds patterns the parser can't infer. **Rejected:** a hand-kept `do_not_claim.json`. Two lists drift, and the one that drifts is the one that matters.
+
+### Only the first sentence of a DO NOT CLAIM item is the claim
+"60% search-latency cut, or 3s to 1.2s. Made up. Latency did improve…": the numbers after the first sentence are explanation, not forbidden claims.
+
+### One issue per line, with the best-matching entry
+"60%" appears in three DO NOT CLAIM entries. The check reports the one whose wording overlaps the line ("latency" → the latency entry) and says how many others matched, instead of listing the same line three times.
+
+### Tailoring can reword and reorder, never add
+The model sees the base resume with line ids and may only return `{id, after}` edits and bullet permutations. Code applies them, ignoring unknown ids and invalid reorders, so it can't invent a role or a project. Everything it writes goes through the Truth Check like anything else.
+
+### Overrides are explicit, explained, and fragile on purpose
+A Truth Check failure can be overridden only with a written reason (at least a sentence), and any later edit clears the override: you vouched for that text, not the new one. PDF problems (no PDF, or more than one page) can't be overridden, because there'd be nothing sound to submit.
+
+### One structure, two renderers
+The resume is a small plain-text format parsed into one structure, which feeds the PDF (HTML template printed by Chromium), the DOCX (`docx` library), the Truth Check and the diff. **Rejected:** DOCX template → PDF via LibreOffice: a large install on your Mac, and a separate path where the PDF could differ from what was checked.
+
+### "Not applying" isn't an application
+Rejecting in review sets status `withdrawn` with your reason and dismisses the job, and the 30-day company cap ignores withdrawn applications that were never submitted.
+
+### Status transitions are a whitelist
+`draft → ready_for_review → approved → submitted → …`. Every change goes through `assertTransition`, so nothing can jump from draft to submitted.

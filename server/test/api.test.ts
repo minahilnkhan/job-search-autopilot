@@ -1,11 +1,11 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { buildApp } from "../src/app";
 import { DEFAULT_SETTINGS } from "../src/domain/settingsDefaults";
-import { FDE_JD, makeTestDb, OFFLINE_PIPELINE } from "./helpers";
+import { FDE_JD, makeTestDb, OFFLINE_PIPELINE, prepDeps } from "./helpers";
 
 let app: ReturnType<typeof buildApp>;
 beforeEach(() => {
-  app = buildApp(makeTestDb(), { pipeline: OFFLINE_PIPELINE });
+  app = buildApp(makeTestDb(), { pipeline: OFFLINE_PIPELINE, prep: prepDeps() });
 });
 
 const post = (url: string, payload: unknown) => app.inject({ method: "POST", url, payload: payload as object });

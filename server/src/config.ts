@@ -11,5 +11,7 @@ export const config = {
   migrationsFolder: path.resolve(ROOT, "server/drizzle"),
   companySeedCsv: path.resolve(ROOT, "data/companies.seed.csv"),
   privateDir: path.resolve(ROOT, "data/private"),
+  generatedDir: path.resolve(ROOT, "data/generated"), // resumes as PDF/DOCX (gitignored)
+  chromiumPath: process.env.CHROMIUM_PATH?.trim() || undefined, // optional override for PDF rendering
   anthropicApiKey: process.env.ANTHROPIC_API_KEY?.trim() || null,
 };

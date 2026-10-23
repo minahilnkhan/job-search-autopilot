@@ -1,4 +1,8 @@
 import type {
+  ApplicationDetail,
+  ApplicationSummary,
+  BaseResume,
+  BaseType,
   Company,
   CreateJobRequest,
   CreateJobResponse,
@@ -60,6 +64,23 @@ export const api = {
   listRuns: () => request<{ running: boolean; progress: PipelineProgress | null; runs: PipelineRun[] }>("GET", "/api/pipeline/runs"),
   stopPipeline: () => request<{ stopping: boolean }>("POST", "/api/pipeline/stop", {}),
   getShortlist: () => request<Shortlist | null>("GET", "/api/shortlist"),
+  // Phase 3
+  bases: () => request<BaseResume[]>("GET", "/api/resumes/bases"),
+  saveBase: (type: BaseType, text: string) => request<BaseResume>("PUT", `/api/resumes/bases/${type}`, { text }),
+  prepare: (jobId: number) => request<ApplicationDetail>("POST", "/api/applications", { jobId }),
+  applications: (view: "review" | "blocked" | "snoozed" | "approved" | "closed") =>
+    request<ApplicationSummary[]>("GET", `/api/applications?view=${view}`),
+  application: (id: number) => request<ApplicationDetail>("GET", `/api/applications/${id}`),
+  editApplication: (
+    id: number,
+    body: { recruiterNote?: string | null; answers?: { index: number; answer: string }[]; lines?: { id: string; text: string }[] }
+  ) => request<ApplicationDetail>("PATCH", `/api/applications/${id}`, body),
+  regenerate: (id: number) => request<ApplicationDetail>("POST", `/api/applications/${id}/regenerate`, {}),
+  override: (id: number, reason: string) => request<ApplicationDetail>("POST", `/api/applications/${id}/override`, { reason }),
+  approve: (id: number) => request<ApplicationDetail>("POST", `/api/applications/${id}/approve`, {}),
+  unapprove: (id: number) => request<ApplicationDetail>("POST", `/api/applications/${id}/unapprove`, {}),
+  reject: (id: number, reason: string) => request<ApplicationDetail>("POST", `/api/applications/${id}/reject`, { reason }),
+  snooze: (id: number, until: string | null) => request<ApplicationDetail>("POST", `/api/applications/${id}/snooze`, { until }),
   monthSpend: () => request<{ month: string; calls: number; costUsd: number; unpricedCalls: number }>("GET", "/api/usage/month"),
 };
 

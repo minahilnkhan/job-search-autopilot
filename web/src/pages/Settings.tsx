@@ -91,6 +91,28 @@ export function Settings() {
       </fieldset>
 
       <fieldset className="panel space-y-4 p-5">
+        <legend className="px-1 text-lg font-semibold">Standard answers</legend>
+        <p className="text-[15px] text-ink-soft">
+          Your own answers to common questions, added to every application as written. Anything in [brackets] is a placeholder;
+          the Truth Check holds applications back until it's filled in.
+        </p>
+        {s.standardAnswers.map((a, i) => (
+          <div key={i} className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)_auto] sm:items-start">
+            <input className="field" aria-label={`Question ${i + 1}`} value={a.question}
+              onChange={(e) => setS({ ...s, standardAnswers: s.standardAnswers.map((x, j) => (j === i ? { ...x, question: e.target.value } : x)) })} />
+            <textarea className={`field ${/\[[^\]]+\]/.test(a.answer) ? "border-warn" : ""}`} rows={2} aria-label={`Answer ${i + 1}`} value={a.answer}
+              onChange={(e) => setS({ ...s, standardAnswers: s.standardAnswers.map((x, j) => (j === i ? { ...x, answer: e.target.value } : x)) })} />
+            <button type="button" className="btn-quiet py-1.5" onClick={() => setS({ ...s, standardAnswers: s.standardAnswers.filter((_, j) => j !== i) })}>
+              Remove
+            </button>
+          </div>
+        ))}
+        <button type="button" className="btn-quiet" onClick={() => setS({ ...s, standardAnswers: [...s.standardAnswers, { question: "", answer: "" }] })}>
+          Add a question
+        </button>
+      </fieldset>
+
+      <fieldset className="panel space-y-4 p-5">
         <legend className="px-1 text-lg font-semibold">Location</legend>
         <div>
           <label className="label">Preferred locations (comma-separated, used to break ties)</label>

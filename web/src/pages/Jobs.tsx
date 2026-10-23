@@ -4,6 +4,7 @@ import { api } from "../lib/api";
 import { FieldsEditor } from "../components/FieldsEditor";
 import { ReasonList, VerdictBadge } from "../components/Verdict";
 import { ScoreBadge, ScoreBreakdownView } from "../components/Score";
+import { AcceptButton } from "../components/AcceptButton";
 
 type View = "all" | "passing" | "failing" | "accepted" | "dismissed" | "offTarget";
 const isOffTarget = (j: JobListItem) => j.filterReasons.some((r) => r.code === "off_target_role");
@@ -94,12 +95,11 @@ function JobRow({ job, onChange }: { job: JobListItem; onChange: (j: JobListItem
                 </button>
               )}
               {job.status !== "shortlisted" ? (
-                <button className="btn-quiet" onClick={() => update({ status: "shortlisted" })} disabled={!job.hardFilterPass}
-                  title={job.hardFilterPass ? undefined : "Fix or correct the failing fields first"}>
-                  Accept
-                </button>
+                job.hardFilterPass && (
+                  <AcceptButton jobId={job.id} tier={job.tier} className="btn-quiet" onDone={() => api.getJob(job.id).then(onChange)} />
+                )
               ) : (
-                <button className="btn-quiet" onClick={() => update({ status: "new" })}>Undo accept</button>
+                <a className="btn-quiet" href="#/review">Open in Review</a>
               )}
               {job.status !== "dismissed" ? (
                 <button className="btn-quiet" onClick={() => update({ status: "dismissed" })}>Dismiss</button>

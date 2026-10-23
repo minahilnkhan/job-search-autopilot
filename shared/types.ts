@@ -123,6 +123,8 @@ export type Settings = {
   locationPrefs: { preferred: string[]; openToRelocation: boolean };
   models: { scoring: string; tailoring: string; checkIns: string };
   /** What makes Today's picks. Only applies to ranking; scoring is unchanged. */
+  /** Your own answers to common application questions, reused as-is (never AI-written). */
+  standardAnswers: { question: string; answer: string }[];
   shortlist: {
     minFitScore: number; // 1–10; jobs below this never make Today's picks
     maxAgeDays: number; // postings older than this never make Today's picks
@@ -199,3 +201,85 @@ export type PipelineProgress = {
 
 export type ShortlistEntry = { rank: number; job: Job; eVerify: EVerify; warmContact: boolean };
 export type Shortlist = { date: string; run: PipelineRun | null; entries: ShortlistEntry[] };
+
+// ---- Phase 3: resumes, Truth Check, applications -----------------------------
+
+export type ResumeEntry = {
+  org: string;
+  location: string | null;
+  role: string | null;
+  dates: string | null;
+  bullets: string[];
+};
+export type ResumeSection = { title: string; entries: ResumeEntry[]; lines: string[] };
+export type ResumeContent = { name: string; contact: string; sections: ResumeSection[] };
+export type BaseType = "fde" | "swe";
+
+/** One changed line in a tailored resume, shown as before → after. */
+export type ResumeChange = { id: string; where: string; before: string; after: string; reason: string };
+
+export type TruthIssueKind = "unverified_number" | "do_not_claim" | "ownership" | "placeholder" | "length" | "banned_word" | "render";
+export type TruthIssue = {
+  kind: TruthIssueKind;
+  severity: "fail" | "warn";
+  where: string; // e.g. "Resume › Experience › Yabla › bullet 2", "Recruiter note"
+  text: string; // the offending line
+  message: string; // why, in plain words
+  lineId?: string; // resume line id, so the UI can jump to it
+};
+export type TruthReport = { pass: boolean; issues: TruthIssue[]; checkedAt: number };
+
+export type Answer = { question: string; answer: string; source: "fixed" | "standard" | "generated" };
+
+export type ApplicationStatus =
+  | "draft"
+  | "ready_for_review"
+  | "approved"
+  | "submitted"
+  | "screen"
+  | "interview"
+  | "offer"
+  | "rejected"
+  | "ghosted"
+  | "withdrawn";
+
+export type ApplicationSummary = {
+  id: number;
+  jobId: number;
+  jobTitle: string;
+  companyName: string;
+  tier: "A" | "B" | null;
+  fitScore: number | null;
+  status: ApplicationStatus;
+  truthPass: boolean;
+  truthOverride: { reason: string; at: number } | null;
+  failCount: number;
+  snoozedUntil: string | null;
+  createdAt: number;
+};
+
+export type ApplicationDetail = ApplicationSummary & {
+  job: Job;
+  baseType: BaseType;
+  resume: ResumeContent;
+  resumeText: string;
+  changes: ResumeChange[];
+  recruiterNote: string | null;
+  answers: Answer[];
+  truth: TruthReport;
+  pdfPages: number | null;
+  hasPdf: boolean;
+  hasDocx: boolean;
+  prepNotes: string[];
+  reviewReason: string | null; // why you rejected it
+  tailoring: { keywordsCovered: string[]; keywordsMissing: string[]; honestGaps: string[] } | null;
+};
+
+export type BaseResume = {
+  baseType: BaseType;
+  id: number | null;
+  text: string;
+  truth: TruthReport | null;
+  pdfPages: number | null;
+  hasPdf: boolean;
+};

@@ -26,6 +26,7 @@ export function applicationHistory(
     .select({
       jobId: jobs.id,
       title: jobs.title,
+      status: applications.status,
       approvedAt: applications.approvedAt,
       submittedAt: applications.submittedAt,
     })
@@ -38,7 +39,9 @@ export function applicationHistory(
         args.excludeJobId !== undefined ? ne(jobs.id, args.excludeJobId) : undefined
       )
     )
-    .all();
+    .all()
+    // Rejected in review (withdrawn before it was ever sent) isn't an application.
+    .filter((r) => !(r.status === "withdrawn" && r.submittedAt === null));
 
   const cutoff = args.now.getTime() - 30 * DAY_MS;
   const title = normalizeTitle(args.title);

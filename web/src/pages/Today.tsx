@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import type { PipelineProgress, PipelineRun, Shortlist, ShortlistEntry } from "../../../shared/types";
 import { api, usd } from "../lib/api";
 import { ScoreBadge, ScoreBreakdownView } from "../components/Score";
+import { AcceptButton } from "../components/AcceptButton";
 
 const EVERIFY_TEXT = { confirmed: "E-Verify confirmed", likely: "E-Verify likely", unknown: "E-Verify not checked" } as const;
 const SPONSOR_TEXT = { yes: "Sponsors visas", no: "No sponsorship", unstated: "Sponsorship not stated" } as const;
@@ -21,7 +22,7 @@ function progressText(p: PipelineProgress | null): string {
   return `Scoring ${p.scored} of ${p.toScore} jobs, ${usd(p.costUsd)} so far. The list updates when it's done.`;
 }
 
-function Entry({ e, onStatus }: { e: ShortlistEntry; onStatus: (id: number, status: "shortlisted" | "dismissed" | "new") => void }) {
+function Entry({ e, onStatus }: { e: ShortlistEntry; onStatus: (id: number, status: "shortlisted" | "dismissed" | "new", alreadySaved?: boolean) => void }) {
   const [open, setOpen] = useState(false);
   const { job } = e;
   const b = job.scoreBreakdown;
@@ -63,9 +64,9 @@ function Entry({ e, onStatus }: { e: ShortlistEntry; onStatus: (id: number, stat
 
       <div className="flex flex-wrap gap-2 border-t border-line px-4 py-3">
         {job.status !== "shortlisted" ? (
-          <button className="btn-primary py-1.5" onClick={() => onStatus(job.id, "shortlisted")}>Accept</button>
+          <AcceptButton jobId={job.id} tier={job.tier} onDone={() => onStatus(job.id, "shortlisted", true)} />
         ) : (
-          <button className="btn-quiet py-1.5" onClick={() => onStatus(job.id, "new")}>Undo accept</button>
+          <a className="btn-quiet py-1.5" href="#/review">Open in Review</a>
         )}
         {job.status !== "dismissed" ? (
           <button className="btn-quiet py-1.5" onClick={() => onStatus(job.id, "dismissed")}>Dismiss</button>
@@ -130,8 +131,9 @@ export function Today({ onJobsChanged }: { onJobsChanged: () => void }) {
     }
   }
 
-  async function setStatus(id: number, status: "shortlisted" | "dismissed" | "new") {
-    const updated = await api.updateJob(id, { status });
+  async function setStatus(id: number, status: "shortlisted" | "dismissed" | "new", alreadySaved = false) {
+    // Accept saves the status itself (preparing the application marks the job accepted).
+    const updated = alreadySaved ? await api.getJob(id) : await api.updateJob(id, { status });
     setList((l) => l && { ...l, entries: l.entries.map((e) => (e.job.id === id ? { ...e, job: { ...e.job, ...updated } } : e)) });
     onJobsChanged();
   }
@@ -145,7 +147,7 @@ export function Today({ onJobsChanged }: { onJobsChanged: () => void }) {
         <div className="space-y-1">
           <h1 className="text-2xl font-bold tracking-tight">{dateLabel ? `Picks for ${dateLabel}` : "Today's picks"}</h1>
           <p className="text-ink-soft">
-            {list ? `${list.entries.length} ranked jobs, ${accepted} accepted. Accept the ones you'll apply to.` : "Ranked jobs from your companies' job boards, scored against your mentor rubric."}
+            {list ? `${list.entries.length} ranked jobs, ${accepted} accepted. Accept the ones you'll apply to; the app prepares each for review.` : "Ranked jobs from your companies' job boards, scored against your mentor rubric."}
           </p>
         </div>
         {running ? (

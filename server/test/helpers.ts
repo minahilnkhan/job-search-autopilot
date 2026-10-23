@@ -4,6 +4,85 @@ import type { EmploymentFlags, ExtractedFields } from "../../shared/types";
 import type { PipelineDeps } from "../src/services/pipeline";
 import type { ModelJudgment } from "../src/domain/scoring";
 import type { ScoreInput, Scorer } from "../src/llm/scoreJob";
+import fs from "node:fs";
+import path from "node:path";
+import os from "node:os";
+import { parseInventory } from "../src/domain/inventory";
+import type { PrepDeps } from "../src/services/applications";
+import type { Renderer } from "../src/render/renderer";
+import type { Tailor, TailorInput } from "../src/llm/tailor";
+import type { TailorPlan } from "../src/domain/tailorPlan";
+
+export const FIXTURE_FACTS = parseInventory(fs.readFileSync(path.join(import.meta.dirname, "fixtures", "inventory.md"), "utf8"));
+
+/** A base resume that passes the Truth Check against fixtures/inventory.md. */
+export const FIXTURE_RESUME = `# Test Person
+Chicago, IL | test@example.com | github.com/test
+
+## Experience
+### Acme Learning | Remote
+Software Engineer | June 2025 – Present
+- Owned the Word Splitter feature end to end
+- Built the Claude pipeline with prompts, structured output and validation
+- Integrated submit/poll APIs and caching designed by a senior engineer
+
+### Camp | Butler, IN
+Lead Instructor | Summers 2024 and 2025
+- Taught about 150 students per session with a 94% satisfaction score
+
+## Education
+### State University
+BA Computer Science | May 2025
+- GPA above 3.7
+
+## Skills
+Languages: TypeScript, Python, PHP
+`;
+
+/** Renderer that writes placeholder files instead of launching Chromium. */
+export function fakeRenderer(opts: { pages?: number; pdfError?: string } = {}): Renderer {
+  return async (_content, outDir) => {
+    fs.mkdirSync(outDir, { recursive: true });
+    const docxPath = path.join(outDir, "resume.docx");
+    fs.writeFileSync(docxPath, "docx");
+    if (opts.pdfError) return { pdfPath: null, docxPath, pages: null, pdfError: opts.pdfError };
+    const pdfPath = path.join(outDir, "resume.pdf");
+    fs.writeFileSync(pdfPath, "%PDF-fake");
+    return { pdfPath, docxPath, pages: opts.pages ?? 1, pdfError: null };
+  };
+}
+
+export function fakeTailor(plan: Partial<TailorPlan> = {}) {
+  const calls: TailorInput[] = [];
+  const tailor: Tailor = async (input) => {
+    calls.push(input);
+    return {
+      model: "claude-sonnet-5-5",
+      usage: { inputTokens: 3000, outputTokens: 900, cacheWriteTokens: 0, cacheReadTokens: 8000 },
+      plan: {
+        lineEdits: [],
+        bulletOrder: [],
+        recruiterNote: "I built a production Claude pipeline at Acme Learning and would like to do the same for your customers.",
+        answers: input.questions.map((q) => ({ question: q, answer: "I owned the Word Splitter feature end to end." })),
+        keywordsCovered: ["LLM"],
+        keywordsMissing: ["Kubernetes"],
+        honestGaps: [],
+        ...plan,
+      },
+    };
+  };
+  return { tailor, calls };
+}
+
+export function prepDeps(over: Partial<PrepDeps> = {}): PrepDeps {
+  return {
+    getTailor: () => ({ tailor: fakeTailor().tailor }),
+    renderer: fakeRenderer(),
+    facts: () => FIXTURE_FACTS,
+    generatedDir: fs.mkdtempSync(path.join(os.tmpdir(), "autopilot-test-")),
+    ...over,
+  };
+}
 
 /** Pipeline deps that never touch the network: no boards, no scorer. */
 export const OFFLINE_PIPELINE: PipelineDeps = {

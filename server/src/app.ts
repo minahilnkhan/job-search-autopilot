@@ -5,6 +5,10 @@ import { jobRoutes } from "./routes/jobs";
 import { companyRoutes } from "./routes/companies";
 import { settingsRoutes } from "./routes/settings";
 import { pipelineRoutes } from "./routes/pipeline";
+import { applicationRoutes } from "./routes/applications";
+import type { PrepDeps } from "./services/applications";
+import { TransitionError } from "./domain/applicationStatus";
+import { MissingInventoryError } from "./services/truth";
 import { ConflictError, NotFoundError } from "./services/jobs";
 import type { PipelineDeps } from "./services/pipeline";
 
@@ -14,7 +18,7 @@ import type { PipelineDeps } from "./services/pipeline";
  */
 export function buildApp(
   db: DB,
-  opts: { logger?: boolean; pipeline: PipelineDeps; onSettingsChanged?: () => void }
+  opts: { logger?: boolean; pipeline: PipelineDeps; prep: PrepDeps; onSettingsChanged?: () => void }
 ) {
   const app = Fastify({ logger: opts.logger ?? false, bodyLimit: 1024 * 1024 });
 
@@ -26,7 +30,9 @@ export function buildApp(
       });
     }
     if (err instanceof NotFoundError) return reply.code(404).send({ error: err.message });
-    if (err instanceof ConflictError) return reply.code(409).send({ error: err.message });
+    if (err instanceof ConflictError || err instanceof TransitionError || err instanceof MissingInventoryError) {
+      return reply.code(409).send({ error: err.message });
+    }
     app.log.error(err);
     return reply.code(500).send({ error: "Internal error" });
   });
@@ -36,5 +42,6 @@ export function buildApp(
   companyRoutes(app, db);
   settingsRoutes(app, db, opts.onSettingsChanged);
   pipelineRoutes(app, db, opts.pipeline);
+  applicationRoutes(app, db, opts.prep);
   return app;
 }
