@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import type { PipelineRun, Shortlist, ShortlistEntry } from "../../../shared/types";
+import type { PipelineProgress, PipelineRun, Shortlist, ShortlistEntry } from "../../../shared/types";
 import { api, usd } from "../lib/api";
 import { ScoreBadge, ScoreBreakdownView } from "../components/Score";
 
@@ -12,6 +12,13 @@ function runSummary(run: PipelineRun): string {
   if (!s) return `Last run ${when}`;
   const stale = s.skippedStale ? `, ${s.skippedStale} older than 30 days skipped` : "";
   return `Last run ${when}: ${s.postingsSeen} postings from ${s.companies} companies, ${s.newJobs} new, ${s.scored} scored (${usd(s.costUsd)})${stale}.`;
+}
+
+function progressText(p: PipelineProgress | null): string {
+  if (!p) return "Starting…";
+  if (p.stopRequested) return `Stopping after the jobs already being scored. ${p.scored} scored so far (${usd(p.costUsd)}); the rest wait for the next run.`;
+  if (p.phase === "fetching") return `Fetching job boards: ${p.companiesDone} of ${p.companiesTotal} companies. This part is free.`;
+  return `Scoring ${p.scored} of ${p.toScore} jobs, ${usd(p.costUsd)} so far. The list updates when it's done.`;
 }
 
 function Entry({ e, onStatus }: { e: ShortlistEntry; onStatus: (id: number, status: "shortlisted" | "dismissed" | "new") => void }) {
@@ -84,6 +91,7 @@ function Entry({ e, onStatus }: { e: ShortlistEntry; onStatus: (id: number, stat
 export function Today({ onJobsChanged }: { onJobsChanged: () => void }) {
   const [list, setList] = useState<Shortlist | null | undefined>(undefined);
   const [running, setRunning] = useState(false);
+  const [progress, setProgress] = useState<PipelineProgress | null>(null);
   const [lastRun, setLastRun] = useState<PipelineRun | null>(null);
   const [spend, setSpend] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -92,6 +100,7 @@ export function Today({ onJobsChanged }: { onJobsChanged: () => void }) {
     const [sl, runs, month] = await Promise.all([api.getShortlist(), api.listRuns(), api.monthSpend()]);
     setList(sl);
     setRunning(runs.running);
+    setProgress(runs.progress);
     setLastRun(runs.runs[0] ?? null);
     setSpend(month.costUsd);
     return runs.running;
@@ -139,13 +148,24 @@ export function Today({ onJobsChanged }: { onJobsChanged: () => void }) {
             {list ? `${list.entries.length} ranked jobs, ${accepted} accepted. Accept the ones you'll apply to.` : "Ranked jobs from your companies' job boards, scored against your mentor rubric."}
           </p>
         </div>
-        <button className="btn-primary" onClick={runNow} disabled={running}>
-          {running ? "Running…" : "Run now"}
-        </button>
+        {running ? (
+          <button
+            className="btn-quiet"
+            disabled={progress?.stopRequested}
+            onClick={async () => {
+              await api.stopPipeline();
+              setProgress((p) => p && { ...p, stopRequested: true });
+            }}
+          >
+            {progress?.stopRequested ? "Stopping…" : "Stop"}
+          </button>
+        ) : (
+          <button className="btn-primary" onClick={runNow}>Run now</button>
+        )}
       </header>
 
       <div className="space-y-1 text-[15px] text-ink-soft" role="status">
-        {running && <p className="text-ink">Fetching job boards and scoring. This takes a few minutes; the list updates when it's done.</p>}
+        {running && <p className="text-ink">{progressText(progress)}</p>}
         {!running && lastRun && <p>{runSummary(lastRun)}</p>}
         {!running && lastRun?.message && (
           <p className={lastRun.status === "failed" ? "text-fail" : "text-warn"}>{lastRun.message}</p>

@@ -13,7 +13,7 @@ import { applicationHistory } from "./history";
 import { filterJob, toJob, updateJob, NotFoundError } from "./jobs";
 import { getSettings, localDate } from "./settings";
 import { recordUsage } from "./usage";
-import type { Job, PipelineRun, RunStats, Settings, Shortlist } from "../../../shared/types";
+import type { Job, PipelineProgress, PipelineRun, RunStats, Settings, Shortlist } from "../../../shared/types";
 
 // The daily pipeline: fetch → dedupe → hard filters → AI scoring → shortlist.
 // Deterministic steps come first so the paid step only sees jobs that can
@@ -99,8 +99,11 @@ async function fetchAll(db: DB, deps: PipelineDeps, now: Date) {
     .where(and(inArray(companies.atsType, ["greenhouse", "lever", "ashby"]), isNotNull(companies.atsBoardToken)))
     .all();
   const stats = { companies: boards.length, companiesFailed: 0, postingsSeen: 0, newJobs: 0, passedFilters: 0 };
+  if (progress) Object.assign(progress, { phase: "fetching", companiesTotal: boards.length, companiesDone: 0 });
   // One company at a time: polite to the job boards, and fast enough for ~a dozen.
   for (const c of boards) {
+    if (stopRequested()) break;
+    if (progress) progress.companiesDone++;
     try {
       const postings = await deps.fetchBoard({ atsType: c.atsType as "greenhouse" | "lever" | "ashby", token: c.atsBoardToken! });
       const r = ingestPostings(db, c, postings, now);
@@ -165,7 +168,6 @@ export async function scoreJob(db: DB, jobId: number, scorer: Scorer, now: Date)
   return { costUsd: cost };
 }
 
-/** Unscored jobs that passed the filters, newest postings first, up to the per-run cap. */
 /** Postings older than this aren't scored: the mentor prompt treats them as likely stale or ghost jobs. */
 export const MAX_SCORE_AGE_DAYS = 30;
 
@@ -184,6 +186,7 @@ export function refilterUnscored(db: DB, now: Date): number {
   return ids.length;
 }
 
+/** Unscored, recent jobs that passed the filters, newest postings first, up to the per-run cap. */
 async function scorePending(db: DB, scorer: Scorer, max: number, now: Date) {
   const unscored = db
     .select({ id: jobs.id, postedAt: jobs.postedAt })
@@ -203,14 +206,21 @@ async function scorePending(db: DB, scorer: Scorer, max: number, now: Date) {
     costUsd: 0,
     firstError: null as string | null,
     stoppedBecause: null as string | null,
+    stoppedByYou: false,
     notAttempted: 0,
   };
+  if (progress) Object.assign(progress, { phase: "scoring", toScore: batch.length, scored: 0 });
 
   const scoreOne = async (id: number) => {
     if (out.stoppedBecause) return;
+    if (stopRequested()) {
+      out.stoppedByYou = true;
+      return;
+    }
     try {
       out.costUsd += (await scoreJob(db, id, scorer, now)).costUsd;
       out.scored++;
+      if (progress) Object.assign(progress, { scored: out.scored, costUsd: out.costUsd });
     } catch (err) {
       // No credits / bad key fails every call the same way: stop instead of
       // sending the rest of the batch just to collect the same error.
@@ -285,6 +295,27 @@ export function buildShortlist(db: DB, settings: Settings, now: Date): number[] 
 let running = false;
 export const isPipelineRunning = () => running;
 
+// Live progress of the current run, for the UI's counter and Stop button.
+let progress: PipelineProgress | null = null;
+export const getPipelineProgress = () => progress;
+
+/** Ask the current run to stop after the calls already in flight (at most a few). */
+export function requestStop(): boolean {
+  if (!running || !progress) return false;
+  progress.stopRequested = true;
+  return true;
+}
+const stopRequested = () => progress?.stopRequested === true;
+
+/** Runs left "running" by an app that quit mid-run would otherwise look busy forever. */
+export function markInterruptedRuns(db: DB): number {
+  return db
+    .update(pipelineRuns)
+    .set({ status: "failed", finishedAt: new Date(), message: "Interrupted: the app stopped during this run. Anything scored before that was kept." })
+    .where(eq(pipelineRuns.status, "running"))
+    .run().changes;
+}
+
 export class PipelineBusyError extends Error {}
 
 function toRun(r: typeof pipelineRuns.$inferSelect): PipelineRun {
@@ -302,6 +333,7 @@ function toRun(r: typeof pipelineRuns.$inferSelect): PipelineRun {
 export async function runPipeline(db: DB, deps: PipelineDeps, trigger: PipelineRun["trigger"]): Promise<PipelineRun> {
   if (running) throw new PipelineBusyError("A run is already in progress.");
   running = true;
+  progress = { phase: "fetching", companiesDone: 0, companiesTotal: 0, scored: 0, toScore: 0, costUsd: 0, stopRequested: false };
   const now = deps.now?.() ?? new Date();
   const settings = getSettings(db);
   const run = db.insert(pipelineRuns).values({ trigger, startedAt: now }).returning().get();
@@ -317,7 +349,9 @@ export async function runPipeline(db: DB, deps: PipelineDeps, trigger: PipelineR
     if (stats.companiesFailed) notes.push(`${stats.companiesFailed} job board(s) failed; see Companies.`);
 
     const s = deps.getScorer(settings);
-    if ("unavailable" in s) {
+    if (stopRequested()) {
+      notes.push("Stopped by you before scoring started. Unscored jobs will be scored on the next run.");
+    } else if ("unavailable" in s) {
       notes.push(`Scoring skipped: ${s.unavailable}`);
     } else {
       const r = await scorePending(db, s.scorer, settings.pipeline.maxScoresPerRun, now);
@@ -326,6 +360,7 @@ export async function runPipeline(db: DB, deps: PipelineDeps, trigger: PipelineR
       stats.skippedOverCap = r.skippedOverCap;
       stats.skippedStale = r.skippedStale;
       stats.costUsd = r.costUsd;
+      if (r.stoppedByYou) notes.push(`Stopped by you after ${r.scored} job(s). ${r.notAttempted} job(s) are waiting and will be scored on the next run.`);
       if (r.stoppedBecause) notes.push(`Scoring stopped: ${r.stoppedBecause} ${r.notAttempted} job(s) are waiting and will be scored on the next run.`);
       if (r.scoreErrors) notes.push(`${r.scoreErrors} job(s) failed to score. First error: ${r.firstError}`);
       if (r.skippedOverCap) notes.push(`${r.skippedOverCap} job(s) left for the next run (per-run scoring cap).`);
@@ -358,6 +393,7 @@ export async function runPipeline(db: DB, deps: PipelineDeps, trigger: PipelineR
     return toRun(done);
   } finally {
     running = false;
+    progress = null;
   }
 }
 

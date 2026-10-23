@@ -1,7 +1,16 @@
 import type { FastifyInstance } from "fastify";
 import type { DB } from "../db/client";
 import { getJob } from "../services/jobs";
-import { getShortlist, isPipelineRunning, listRuns, runPipeline, scoreJob, type PipelineDeps } from "../services/pipeline";
+import {
+  getPipelineProgress,
+  getShortlist,
+  isPipelineRunning,
+  listRuns,
+  requestStop,
+  runPipeline,
+  scoreJob,
+  type PipelineDeps,
+} from "../services/pipeline";
 import { getSettings } from "../services/settings";
 import { monthSpend } from "../services/usage";
 import { ConflictError } from "../services/jobs";
@@ -18,7 +27,14 @@ export function pipelineRoutes(app: FastifyInstance, db: DB, deps: PipelineDeps)
     return { started: true };
   });
 
-  app.get("/api/pipeline/runs", async () => ({ running: isPipelineRunning(), runs: listRuns(db) }));
+  app.get("/api/pipeline/runs", async () => ({
+    running: isPipelineRunning(),
+    progress: getPipelineProgress(),
+    runs: listRuns(db),
+  }));
+
+  // Stops after the few calls already in flight; everything scored so far is kept.
+  app.post("/api/pipeline/stop", async () => ({ stopping: requestStop() }));
 
   app.get("/api/shortlist", async (req) => {
     const { date } = req.query as { date?: string };

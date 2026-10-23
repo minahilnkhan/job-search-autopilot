@@ -250,3 +250,33 @@ describe("cost cuts", () => {
     expect(de.filterFailReasons.map((r) => r.code)).toContain("off_target_role");
   });
 });
+
+describe("progress and stopping", () => {
+  it("reports progress while running and stops early when asked, keeping what was scored", async () => {
+    const { getPipelineProgress, requestStop } = await import("../src/services/pipeline");
+    let seen: ReturnType<typeof getPipelineProgress> = null;
+    const slowScorer: PipelineDeps["getScorer"] = () => ({
+      scorer: async (input) => {
+        const res = await fakeScorer().scorer(input);
+        seen ??= { ...getPipelineProgress()! };
+        requestStop(); // ask to stop after the first job
+        return res;
+      },
+    });
+    const run = await runPipeline(db, { ...deps(), getScorer: slowScorer }, "manual");
+    expect(seen).toMatchObject({ phase: "scoring", toScore: 4 });
+    expect(run.stats?.scored).toBe(1);
+    expect(run.message).toContain("Stopped by you after 1 job(s). 3 job(s) are waiting");
+    expect(getPipelineProgress()).toBeNull();
+    // The rest are picked up next time.
+    expect((await runPipeline(db, deps(), "manual")).stats?.scored).toBe(3);
+  });
+
+  it("marks runs left 'running' by a quit app as interrupted", async () => {
+    const { markInterruptedRuns } = await import("../src/services/pipeline");
+    const { pipelineRuns } = await import("../src/db/schema");
+    db.insert(pipelineRuns).values({ trigger: "manual", startedAt: NOW, status: "running" }).run();
+    expect(markInterruptedRuns(db)).toBe(1);
+    expect(listRuns(db)[0]).toMatchObject({ status: "failed", message: expect.stringContaining("Interrupted") });
+  });
+});

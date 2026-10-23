@@ -7,6 +7,7 @@ import type {
   FilterReason,
   Job,
   JobListItem,
+  PipelineProgress,
   PipelineRun,
   Settings,
   Shortlist,
@@ -56,7 +57,8 @@ export const api = {
   getSettings: () => request<Settings>("GET", "/api/settings"),
   saveSettings: (body: Settings) => request<Settings>("PUT", "/api/settings", body),
   runPipeline: () => request<{ started: boolean }>("POST", "/api/pipeline/run", {}),
-  listRuns: () => request<{ running: boolean; runs: PipelineRun[] }>("GET", "/api/pipeline/runs"),
+  listRuns: () => request<{ running: boolean; progress: PipelineProgress | null; runs: PipelineRun[] }>("GET", "/api/pipeline/runs"),
+  stopPipeline: () => request<{ stopping: boolean }>("POST", "/api/pipeline/stop", {}),
   getShortlist: () => request<Shortlist | null>("GET", "/api/shortlist"),
   monthSpend: () => request<{ month: string; calls: number; costUsd: number; unpricedCalls: number }>("GET", "/api/usage/month"),
 };

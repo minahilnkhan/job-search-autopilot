@@ -5,13 +5,14 @@ import { config } from "./config";
 import { anthropicScorerFactory } from "./llm/factory";
 import { fetchBoard } from "./sources/boards";
 import { startScheduler } from "./scheduler";
-import type { PipelineDeps } from "./services/pipeline";
+import { markInterruptedRuns, type PipelineDeps } from "./services/pipeline";
 
 const db = createDb();
 // Migrate + seed on boot so a fresh clone works with just `npm run dev`.
 // Both are idempotent.
 runMigrations(db);
 seed(db);
+markInterruptedRuns(db); // a run can't still be going if the app just started
 
 const pipeline: PipelineDeps = { fetchBoard, getScorer: anthropicScorerFactory };
 let reschedule = () => {};

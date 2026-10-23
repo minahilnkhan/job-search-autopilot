@@ -180,5 +180,16 @@ export type PipelineRun = {
   message: string | null;
 };
 
+/** Live state of the run in progress (GET /api/pipeline/runs). */
+export type PipelineProgress = {
+  phase: "fetching" | "scoring";
+  companiesDone: number;
+  companiesTotal: number;
+  scored: number;
+  toScore: number;
+  costUsd: number;
+  stopRequested: boolean;
+};
+
 export type ShortlistEntry = { rank: number; job: Job; eVerify: EVerify; warmContact: boolean };
 export type Shortlist = { date: string; run: PipelineRun | null; entries: ShortlistEntry[] };
