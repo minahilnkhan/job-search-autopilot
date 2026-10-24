@@ -309,3 +309,64 @@ export async function prefillPage(page: Page, values: PrefillValues, resumePath:
   if (await captchaVisible(page)) result.notices.push("The page is showing a CAPTCHA. Solve it in the window; the app won't touch it.");
   return result;
 }
+
+export type FormReading = {
+  prepared: { label: string; value: string }[];
+  leftForYou: LeftForYou[];
+  asks: { control: FormControl; question: string; draft: string | null }[];
+  notices: string[];
+  readError?: string;
+};
+
+/**
+ * Copy mode, for sites that block automated browsers: read the form's
+ * questions (never fill or submit), and work out every answer so you can
+ * paste them in your own browser, in the form's order.
+ */
+export async function readFormForCopy(page: Page, values: PrefillValues, onQuestions?: QuestionHandler): Promise<FormReading> {
+  const out: FormReading = { prepared: [], leftForYou: [], asks: [], notices: [] };
+  await waitForForm(page);
+  await page.waitForLoadState("networkidle", { timeout: 8000 }).catch(() => {});
+  let found = false;
+  for (const frame of page.frames()) {
+    let controls: FormControl[];
+    try {
+      controls = await readFields(frame);
+    } catch (err) {
+      if (frame === page.mainFrame()) out.readError = (err as Error).message.split("\n")[0]!;
+      continue;
+    }
+    if (!controls.some((c) => c.kind !== "file")) continue;
+    found = true;
+    const plan = planFill(controls, values);
+    const byControl = new Map<string, string>();
+    for (const a of plan.actions) byControl.set(a.id, a.op === "upload" ? `Attach ${a.value}` : a.value);
+    const handled = new Set<string>();
+    if (onQuestions && plan.unanswered.length) {
+      try {
+        const r = await onQuestions(plan.unanswered);
+        for (const a of r.answers) {
+          byControl.set(a.controlId, a.value);
+          handled.add(a.controlId);
+        }
+        for (const q of r.asks) {
+          const c = plan.unanswered.find((x) => x.id === q.controlId);
+          if (c && !handled.has(c.id)) {
+            out.asks.push({ control: c, question: q.question, draft: q.draft });
+            handled.add(c.id);
+          }
+        }
+      } catch (err) {
+        out.notices.push(`Couldn't draft answers for the open questions (${(err as Error).message.split("\n")[0]}).`);
+      }
+    }
+    // In the form's order.
+    for (const c of controls) {
+      const v = byControl.get(c.id);
+      if (v) out.prepared.push({ label: c.label.replace(/[✱*]\s*$/, "").replace(/\s+/g, " ").trim() || "(unlabeled field)", value: v });
+    }
+    out.leftForYou.push(...plan.leftForYou.filter((l) => !l.controlId || !handled.has(l.controlId)));
+  }
+  if (!found) out.notices.push("Couldn't read the form's questions. The copy panel below still has all your details and answers.");
+  return out;
+}

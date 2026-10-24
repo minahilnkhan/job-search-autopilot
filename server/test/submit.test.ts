@@ -383,3 +383,109 @@ describe.skipIf(!chromiumPath)("drafting answers and asking you", () => {
     expect(await page!.evaluate(() => (window as { __submitted?: boolean }).__submitted ?? false)).toBe(false);
   }, 30000);
 });
+
+describe("sites that block automated browsers", () => {
+  it("recognizes a spam block and keys sites by ATS or hostname", async () => {
+    const { looksBlocked, siteKey } = await import("../src/submit/confirm");
+    expect(looksBlocked("We couldn't submit your application. Your application submission was flagged as possible spam.")).toBe(true);
+    expect(looksBlocked("Apply for this job. Name. Email. Submit application")).toBe(false);
+    expect(siteKey("ashby", "https://jobs.ashbyhq.com/x/y")).toBe("ashby");
+    expect(siteKey("other", "https://www.acme.com/careers/1")).toBe("acme.com");
+  });
+});
+
+describe.skipIf(!chromiumPath)("copy mode and spam blocks through the API", () => {
+  let browser: Browser;
+  beforeAll(async () => {
+    const { chromium } = await import("playwright");
+    browser = await chromium.launch({ executablePath: chromiumPath });
+  });
+  afterAll(async () => {
+    resetSubmitSessions();
+    await browser?.close();
+  });
+
+  async function setupApp(fixture: string, jobUrl: string, writer?: import("../src/llm/answers").AnswerWriter) {
+    const db = makeTestDb();
+    db.update(settings).set({ standardAnswers: [{ question: "When can you start?", answer: "Two weeks." }], profile: PROFILE }).run();
+    const opened: { url: string; headless: boolean; page: Page }[] = [];
+    const app = buildApp(db, {
+      pipeline: OFFLINE_PIPELINE,
+      prep: prepDeps(),
+      submit: {
+        watchEveryMs: 100,
+        facts: () => FIXTURE_FACTS,
+        getAnswerWriter: writer ? () => ({ writer }) : undefined,
+        openPage: async (url, opts) => {
+          const page = await browser.newPage();
+          await page.route("**/*", (route) => {
+            const u = route.request().url();
+            if (u.endsWith("/blocked")) return route.fulfill({ contentType: "text/html", body: "<meta charset=utf-8><p>We couldn't submit your application</p><p>Your application submission was flagged as possible spam.</p>" });
+            if (u.endsWith("combobox.js")) return route.fulfill({ contentType: "text/javascript", body: fs.readFileSync(path.join(FORMS, "combobox.js"), "utf8") });
+            return route.fulfill({ contentType: "text/html", body: fs.readFileSync(path.join(FORMS, fixture), "utf8") });
+          });
+          await page.goto(url);
+          opened.push({ url, headless: !!opts?.headless, page });
+          return page;
+        },
+      },
+    });
+    const req = async (method: "GET" | "POST" | "PUT", url: string, payload?: unknown) => {
+      const res = await app.inject({ method, url, payload: payload as object });
+      return { status: res.statusCode, body: res.json() };
+    };
+    await req("PUT", "/api/resumes/bases/fde", { text: FIXTURE_RESUME });
+    await req("PUT", "/api/resumes/bases/swe", { text: FIXTURE_RESUME });
+    const job = (await req("POST", "/api/jobs", { companyName: "Acme AI", title: "Software Engineer", url: jobUrl, location: "Chicago, IL", description: FDE_JD })).body.job;
+    db.update(jobs).set({ tier: "B", fitScore: 6 }).where(eq(jobs.id, job.id)).run();
+    const a = (await req("POST", "/api/applications", { jobId: job.id })).body;
+    await req("POST", `/api/applications/${a.id}/approve`);
+    const settle = async () => {
+      let s = (await req("POST", `/api/applications/${a.id}/submit/open`)).body;
+      for (let i = 0; i < 150 && (!s.report || s.state === "opening"); i++) {
+        await new Promise((r) => setTimeout(r, 100));
+        s = (await req("GET", `/api/applications/${a.id}/submit`)).body;
+      }
+      return s;
+    };
+    return { db, req, a, opened, settle };
+  }
+
+  it("Ashby: reads the form in a hidden window, prepares every answer in order, asks the rest, fills nothing", async () => {
+    const writer: import("../src/llm/answers").AnswerWriter = async (input) => ({
+      model: "claude-sonnet-5-5",
+      usage: { inputTokens: 1, outputTokens: 1, cacheReadTokens: 0, cacheWriteTokens: 0 },
+      items: input.questions.map((q) => ({ id: q.id, action: "ask" as const, answer: "", ask: `What should I say for "${q.label}"?` })),
+    });
+    const { req, a, opened, settle } = await setupApp("ashby.html", "https://jobs.ashbyhq.com/acme/uuid-1", writer);
+    const s = await settle();
+    expect(opened).toHaveLength(1);
+    expect(opened[0]).toMatchObject({ url: "https://jobs.ashbyhq.com/acme/uuid-1/application", headless: true });
+    expect(opened[0]!.page.isClosed()).toBe(true);
+    expect(s.state).toBe("closed");
+    expect(s.report).toMatchObject({ mode: "copy", filled: [], error: null });
+    expect(s.report.prepared.map((p: { label: string }) => p.label)).toEqual(["Name", "Email", "Resume", "LinkedIn Profile", "Phone Number"]);
+    expect(s.report.prepared[0].value).toBe("Minahil Khan");
+    expect(s.report.prepared[2].value).toBe("Attach Test_Person_Resume.pdf");
+    expect(s.report.asks).toEqual([expect.objectContaining({ id: "ask-1", label: "What excites you about this role?" })]);
+
+    const after = (await req("POST", `/api/applications/${a.id}/submit/answer`, { askId: "ask-1", answer: "Building agents for customers.", remember: false })).body;
+    expect(after.report.asks[0]).toMatchObject({ answer: "Building agents for customers.", filled: false });
+    expect(after.report.prepared.at(-1)).toEqual({ label: "What excites you about this role?", value: "Building agents for customers." });
+  }, 30000);
+
+  it("a spam block on a prefilled form adds that site to 'your own browser' and says so", async () => {
+    const { db, req, opened, settle } = await setupApp("lever.html", "https://jobs.lever.co/acme/ab-12");
+    const s = await settle();
+    expect(s.report.mode).toBe("prefill");
+    await opened[0]!.page.goto("https://jobs.lever.co/acme/ab-12/blocked");
+    let report = s.report;
+    for (let i = 0; i < 50 && !report.notices.length; i++) {
+      await new Promise((r) => setTimeout(r, 100));
+      report = (await req("GET", `/api/applications/${s.applicationId}/submit`)).body.report;
+    }
+    expect(report.notices[0]).toContain("flagged the app's window as automated");
+    expect((await req("GET", "/api/settings")).body.submit.ownBrowserFor).toEqual(["ashby", "lever"]);
+    expect(db).toBeTruthy();
+  }, 30000);
+});

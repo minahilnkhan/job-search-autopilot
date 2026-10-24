@@ -7,8 +7,9 @@ import type { DB } from "../db/client";
 import { applications, companies, jobs } from "../db/schema";
 import { assertTransition } from "../domain/applicationStatus";
 import { applyTarget } from "../submit/applyUrl";
-import { looksSubmitted } from "../submit/confirm";
-import { fillControl, prefillPage, type QuestionHandler } from "../submit/prefill";
+import { looksBlocked, looksSubmitted, siteKey } from "../submit/confirm";
+import type { OpenPage } from "../submit/browser";
+import { fillControl, prefillPage, readFormForCopy, type QuestionHandler } from "../submit/prefill";
 import type { FormControl } from "../submit/plan";
 import type { Frame } from "playwright";
 import { runTruthCheck } from "../domain/truthCheck";
@@ -29,7 +30,7 @@ import type { Answer, ApplicationStatus, PrefillReport, Settings, SubmitAsk, Sub
 
 export type SubmitDeps = {
   /** Opens a visible browser tab at the URL. Tests pass a headless one. */
-  openPage: (url: string) => Promise<Page>;
+  openPage: OpenPage;
   /** Drafts answers to questions nothing prepared covers ("Why Anthropic?"). */
   getAnswerWriter?: (s: Settings) => { writer: AnswerWriter } | { unavailable: string };
   /** Inventory facts for the Truth Check on drafted answers. */
@@ -100,6 +101,51 @@ export async function openAndPrefill(db: DB, id: number, deps: SubmitDeps): Prom
     db.update(applications).set({ prefillReport: report, lastActivityAt: new Date() }).where(eq(applications.id, id)).run();
   };
 
+  const values = { profile: settings.profile, answers: app.answers, recruiterNote: app.recruiterNote, resumeFileName: path.basename(resumePath) };
+  const askFor = (label: string, required: boolean, question: string, draft: string | null, i: number): SubmitAsk => ({
+    id: `ask-${i + 1}`,
+    label: clean(label),
+    question,
+    draft,
+    required,
+    answer: null,
+    filled: false,
+  });
+
+  // Sites that block automated browsers: read the form in a hidden window
+  // (no filling, no submitting), prepare every answer, and you apply in your
+  // own browser from the copy panel.
+  if (settings.submit.ownBrowserFor.includes(siteKey(target.ats, target.url))) {
+    void (async () => {
+      let page: Page | null = null;
+      try {
+        page = await deps.openPage(target.url, { headless: true });
+        const drafted: Answer[] = [];
+        const r = await readFormForCopy(page, values, questionHandler(db, id, deps, settings, drafted));
+        if (drafted.length) saveAnswers(db, id, drafted);
+        save({
+          ats: target.ats,
+          url: target.url,
+          mode: "copy",
+          prepared: r.prepared,
+          filled: [],
+          leftForYou: r.leftForYou,
+          resumeUploaded: false,
+          notices: r.notices,
+          asks: r.asks.map((a, i) => askFor(a.control.label, a.control.required, a.question, a.draft, i)),
+          error: null,
+          at: Date.now(),
+        });
+      } catch (err) {
+        save({ ats: target.ats, url: target.url, mode: "copy", prepared: [], filled: [], leftForYou: [], resumeUploaded: false, notices: [], asks: [], error: `Couldn't read the form (${(err as Error).message.split("\n")[0]}). The copy panel still has your details and answers.`, at: Date.now() });
+      } finally {
+        await page?.close().catch(() => {});
+        entry.state = "closed";
+      }
+    })();
+    return getSubmitSession(db, id);
+  }
+
   // Runs in the background; the UI polls the session.
   void (async () => {
     let page: Page;
@@ -118,17 +164,17 @@ export async function openAndPrefill(db: DB, id: number, deps: SubmitDeps): Prom
     try {
       const drafted: Answer[] = [];
       const onQuestions = questionHandler(db, id, deps, settings, drafted);
-      const r = await prefillPage(page, { profile: settings.profile, answers: app.answers, recruiterNote: app.recruiterNote, resumeFileName: path.basename(resumePath) }, resumePath, onQuestions);
+      const r = await prefillPage(page, values, resumePath, onQuestions);
       const { readError, asks, ...found } = r;
       const error = found.filled.length ? null : readError ? `Couldn't read the form (${readError}). Use the copy panel.` : "Found nothing to fill on this page. Use the copy panel.";
       const reportAsks: SubmitAsk[] = asks.map((a, i) => {
         const askId = `ask-${i + 1}`;
         entry.asks.set(askId, { frame: a.frame, control: a.control });
-        return { id: askId, label: a.control.label.replace(/[✱*]\s*$/, "").trim(), question: a.question, draft: a.draft, required: a.control.required, answer: null, filled: false };
+        return askFor(a.control.label, a.control.required, a.question, a.draft, i);
       });
       // Drafted answers join the application's answers, so they show in the copy panel and history.
       if (drafted.length) saveAnswers(db, id, drafted);
-      save({ ats: target.ats, url: target.url, ...found, asks: reportAsks, error, at: Date.now() });
+      save({ ats: target.ats, url: target.url, mode: "prefill", ...found, asks: reportAsks, error, at: Date.now() });
     } catch (err) {
       save({ ats: target.ats, url: target.url, filled: [], leftForYou: [], resumeUploaded: false, notices: [], asks: [], error: `Prefill stopped: ${(err as Error).message.split("\n")[0]}. Use the copy panel.`, at: Date.now() });
     }
@@ -139,6 +185,20 @@ export async function openAndPrefill(db: DB, id: number, deps: SubmitDeps): Prom
       try {
         for (const frame of page.frames()) {
           const body = await frame.locator("body").innerText({ timeout: 1000 }).catch(() => "");
+          if (looksBlocked(body) && entry.report && !entry.report.notices.some((n) => n.startsWith("This site flagged"))) {
+            // Don't fight it: remember the site and hand you the copy panel.
+            const key = siteKey(target.ats, target.url);
+            const current = getSettings(db).submit.ownBrowserFor;
+            if (!current.includes(key)) db.update(settingsTable).set({ submit: { ownBrowserFor: [...current, key] } }).where(eq(settingsTable.id, 1)).run();
+            save({
+              ...entry.report,
+              notices: [
+                ...entry.report.notices,
+                `This site flagged the app's window as automated. Don't submit again there: open the form in your own browser and paste from the copy panel. From now on, ${key} forms go straight to the copy panel (change it in Settings).`,
+              ],
+            });
+            return;
+          }
           if (looksSubmitted(frame.url(), body)) {
             markSubmitted(db, id);
             entry.state = "submitted";
@@ -243,6 +303,7 @@ export async function answerAsk(db: DB, id: number, askId: string, answer: strin
   ask.answer = value;
   ask.filled = filled;
   if (filled) report.filled.push({ label: ask.label, value });
+  if (report.mode === "copy") report.prepared = [...(report.prepared ?? []).filter((p) => p.label !== ask.label), { label: ask.label, value }];
   db.update(applications).set({ prefillReport: report, lastActivityAt: new Date() }).where(eq(applications.id, id)).run();
   if (live) live.report = report;
   saveAnswers(db, id, [{ question: ask.label, answer: value, source: "standard" }]);

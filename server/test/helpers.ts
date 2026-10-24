@@ -61,8 +61,13 @@ export function fakeTailor(plan: Partial<TailorPlan> = {}) {
       model: "claude-sonnet-5-5",
       usage: { inputTokens: 3000, outputTokens: 900, cacheWriteTokens: 0, cacheReadTokens: 8000 },
       plan: {
+        mustHaves: ["LLM"],
+        summary: null,
         lineEdits: [],
         bulletOrder: [],
+        addBullets: [],
+        removeBullets: [],
+        suggestions: [],
         answers: input.questions.map((q) => ({ question: q, answer: "I owned the Word Splitter feature end to end." })),
         keywordsCovered: ["LLM"],
         keywordsMissing: ["Kubernetes"],

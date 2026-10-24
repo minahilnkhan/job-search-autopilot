@@ -74,6 +74,7 @@ export const companyBody = z.object({
 
 const optText = z.string().trim().max(300);
 export const settingsBody = z.object({
+  submit: z.object({ ownBrowserFor: z.array(z.string().trim().toLowerCase().min(1)).max(50) }),
   profile: z.object({
     firstName: optText,
     lastName: optText,

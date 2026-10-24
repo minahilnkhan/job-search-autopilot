@@ -140,7 +140,7 @@ export const applications = sqliteTable(
     reviewReason: text("review_reason"), // why you rejected it in review
     snoozedUntil: text("snoozed_until"), // YYYY-MM-DD
     prepNotes: text("prep_notes", { mode: "json" }).$type<string[]>(),
-    tailoring: text("tailoring", { mode: "json" }).$type<{ keywordsCovered: string[]; keywordsMissing: string[]; honestGaps: string[] }>(),
+    tailoring: text("tailoring", { mode: "json" }).$type<{ keywordsCovered: string[]; keywordsMissing: string[]; honestGaps: string[]; mustHaves?: string[]; suggestions?: string[] }>(),
     // What the recruiter note was built around, so you can judge and edit it.
     noteBasis: text("note_basis", { mode: "json" }).$type<NoteBasis>(),
     // Phase 4: what the assisted-submit prefill filled and left for you.
@@ -249,6 +249,7 @@ export const settings = sqliteTable("settings", {
     .$type<Settings["pipeline"]>()
     .notNull()
     .default(DEFAULT_SETTINGS.pipeline),
+  submit: text("submit", { mode: "json" }).$type<Settings["submit"]>().notNull().default(DEFAULT_SETTINGS.submit),
   profile: text("profile", { mode: "json" }).$type<Settings["profile"]>().notNull().default(DEFAULT_SETTINGS.profile),
   standardAnswers: text("standard_answers", { mode: "json" })
     .$type<Settings["standardAnswers"]>()

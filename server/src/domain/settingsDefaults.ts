@@ -3,6 +3,9 @@ import type { Settings } from "../../../shared/types";
 // Defaults come from job-mentor-prompt.md. Everything is editable on the Settings page.
 export const DEFAULT_SETTINGS: Settings = {
   // For prefilling application forms. Fill in on the Settings page.
+  // Ashby flags the app's automated window as spam, so its forms go through
+  // the copy panel in your own browser. Sites that block it get added here.
+  submit: { ownBrowserFor: ["ashby"] },
   profile: {
     firstName: "",
     lastName: "",

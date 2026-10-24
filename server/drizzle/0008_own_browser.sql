@@ -1,0 +1,1 @@
+ALTER TABLE `settings` ADD `submit` text DEFAULT '{"ownBrowserFor":["ashby"]}' NOT NULL;

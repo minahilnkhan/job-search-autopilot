@@ -5,11 +5,12 @@ import type { ResumeContent } from "../../../shared/types";
 // mirrors the same layout and sizes in docx/resumeDocx.ts.
 
 export const LAYOUT = {
-  font: "Times New Roman",
+  // Arial 10pt+ on 0.5in margins (your ATS notes); Arial ships with every Mac and Windows machine.
+  font: "Arial",
   bodyPt: 10.5,
   namePt: 16,
   headingPt: 11,
-  marginIn: 0.6,
+  marginIn: 0.5,
 };
 
 const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -37,7 +38,7 @@ export function resumeHtml(r: ResumeContent): string {
 <style>
   @page { size: Letter; margin: ${LAYOUT.marginIn}in; }
   * { box-sizing: border-box; }
-  body { margin: 0; font-family: "${LAYOUT.font}", Times, serif; font-size: ${LAYOUT.bodyPt}pt; line-height: 1.22; color: #000; }
+  body { margin: 0; font-family: "${LAYOUT.font}", Helvetica, sans-serif; font-size: ${LAYOUT.bodyPt}pt; line-height: 1.22; color: #000; }
   h1 { font-size: ${LAYOUT.namePt}pt; text-align: center; margin: 0 0 2pt; font-weight: bold; }
   .contact { text-align: center; margin: 0 0 6pt; }
   h2 { font-size: ${LAYOUT.headingPt}pt; text-transform: uppercase; letter-spacing: 0.04em; margin: 7pt 0 3pt; padding-bottom: 1pt; border-bottom: 0.75pt solid #000; }

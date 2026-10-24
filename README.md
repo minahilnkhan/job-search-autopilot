@@ -40,7 +40,7 @@ Every AI call is logged with its token counts and cost. The mentor prompt and in
 
 **Accept and prepare** on a job builds the application:
 
-- **Tier A:** Claude Sonnet 5.5 tailors the matching base resume (FDE or SWE). It may only reword existing lines (by line id) and reorder bullets within a role: no new roles, projects or claims. It also writes a recruiter note under 100 words and answers to common questions.
+- **Tier A:** Claude Sonnet 5.5 tailors the matching base resume (FDE or SWE) following [docs/tailoring.md](docs/tailoring.md): pull the posting's keywords and must-haves, match them against the resume and the inventory, rewrite and reorder bullets so matches come first, add up to three truthful sentences for keywords the inventory supports, drop weaker bullets to stay on one page, and write a summary under 50 words that starts with the posting's role noun. It can't add employers, titles, dates or numbers that aren't in the inventory. Swaps it can't make (e.g. bringing in the TA role) show up as suggestions in Review.
 - **Tier B:** the base resume as-is, plus your standard answers, and a short recruiter note (one small Sonnet call).
 - **Accept returns right away.** Preparation runs in the background; the application appears in Review (under Needs fixes if the Truth Check flags something). A base resume with Truth Check problems has to be fixed on the Resumes page first.
 - **Fix where it's flagged:** every Truth Check problem in Review has its own edit box (resume line, contact line, answer or note). "Write it again" redrafts the note; "Rebuild from base resume" restarts an application after you fix the base.
@@ -76,6 +76,8 @@ Questions nothing prepared covers ("Why Anthropic?", "Tell us about a project") 
 You review the form and press **Submit** yourself. The app never submits and never touches a CAPTCHA (the only button it may press is a resume "Attach" button, to open the file picker). It watches for the "thank you for applying" page and marks the application **submitted**; **I submitted it** does the same by hand. A panel lists what was filled and what's left for you, and a **copy panel** has every value with a copy button, which is also the fallback when a form can't be read.
 
 Fields are found by their visible labels (plus id/name hints), so the same rules cover Greenhouse, Lever, Ashby and most hand-built forms. Voluntary demographic questions, consent checkboxes and anything without a confident match are left for you.
+
+**Sites that block automated browsers** (Ashby flags the app's window as spam) go through **copy mode**: the app reads the form in a hidden window, never filling or submitting, prepares every answer in the form's order with a copy button each, and you apply in your own browser. If any other site shows a spam block, the app says so and adds that site to the list in Settings.
 
 The **Tracker** page lists submitted applications. Move each through screen → interview → offer, or rejected / ghosted / withdrawn. Tier A applications get a follow-up date 7 days after submitting.
 

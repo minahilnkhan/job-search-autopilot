@@ -85,7 +85,7 @@ describe("request settings (thinking counts toward max_tokens)", () => {
       bodies.push(body);
       const req = body.output_config.format.schema.required as string[];
       const text = req.includes("lineEdits")
-        ? JSON.stringify({ lineEdits: [], bulletOrder: [], answers: [], keywordsCovered: [], keywordsMissing: [], honestGaps: [] })
+        ? JSON.stringify({ mustHaves: [], summary: { headline: "", text: "" }, lineEdits: [], bulletOrder: [], addBullets: [], removeBullets: [], answers: [], keywordsCovered: [], keywordsMissing: [], honestGaps: [], suggestions: [] })
         : req.includes("items")
           ? JSON.stringify({ items: [{ id: "ap1", action: "ask", answer: "", ask: "What salary should I put?" }] })
           : req.includes("recruiterNote")
@@ -113,7 +113,7 @@ describe("request settings (thinking counts toward max_tokens)", () => {
     const { bodies, fetchStub } = capture();
     const tailor = makeAnthropicTailor({ apiKey: "test", model: "claude-sonnet-5-5", context, fetch: fetchStub });
     await tailor({ companyName: "Acme", title: "FDE", location: null, description: "JD", baseResume: "[0.0.0] x", questions: [] });
-    expect(bodies[0]).toMatchObject({ max_tokens: 16000, output_config: { effort: "medium" } });
+    expect(bodies[0]).toMatchObject({ max_tokens: 20000, output_config: { effort: "medium" } });
     expect(bodies[0]).not.toHaveProperty("thinking");
   });
 

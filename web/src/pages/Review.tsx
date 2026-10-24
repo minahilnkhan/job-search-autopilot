@@ -231,9 +231,16 @@ function Detail({ id, onChanged, onOpen }: { id: number; onChanged: () => void; 
 
         {app.tailoring && (
           <div className="space-y-1 text-[15px]">
+            {(app.tailoring.mustHaves?.length ?? 0) > 0 && <p><span className="font-medium">Must-haves in the posting:</span> {app.tailoring.mustHaves!.join(", ")}</p>}
             {app.tailoring.keywordsCovered.length > 0 && <p><span className="font-medium">Covers:</span> {app.tailoring.keywordsCovered.join(", ")}</p>}
             {app.tailoring.keywordsMissing.length > 0 && <p><span className="font-medium">Missing:</span> {app.tailoring.keywordsMissing.join(", ")}</p>}
             {app.tailoring.honestGaps.length > 0 && <p className="text-warn"><span className="font-medium">Can't honestly claim:</span> {app.tailoring.honestGaps.join(", ")}</p>}
+            {(app.tailoring.suggestions?.length ?? 0) > 0 && (
+              <div>
+                <p className="font-medium">Worth considering (edit on the Resumes page if you agree):</p>
+                <ul className="list-disc pl-5">{app.tailoring.suggestions!.map((x, i) => <li key={i}>{x}</li>)}</ul>
+              </div>
+            )}
           </div>
         )}
 

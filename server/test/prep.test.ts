@@ -5,7 +5,7 @@ import { applications, apiUsage, companies, jobs, settings } from "../src/db/sch
 import { DEFAULT_SETTINGS } from "../src/domain/settingsDefaults";
 import { applicationHistory } from "../src/services/history";
 import { parseResume, serializeResume } from "../src/domain/resumeFormat";
-import { applyPlan, chooseBase } from "../src/domain/tailorPlan";
+import { applyPlan, chooseBase, summaryTitle } from "../src/domain/tailorPlan";
 import type { DB } from "../src/db/client";
 import { FDE_JD, FIXTURE_RESUME, OFFLINE_PIPELINE, fakeRenderer, fakeTailor, makeTestDb, prepDeps } from "./helpers";
 import type { PrepDeps } from "../src/services/applications";
@@ -44,6 +44,36 @@ async function saveBases() {
 }
 
 beforeEach(() => setup());
+
+describe("tailoring plan: summary, added and removed bullets", () => {
+  it("puts a summary first under a clean headline, shifts ids, adds and drops bullets by the ids the model saw", () => {
+    const base = parseResume(FIXTURE_RESUME);
+    const { content, changes } = applyPlan(base, {
+      summary: { headline: "Software Engineer shipping production LLM features", text: "Software Engineer who built a production Claude pipeline." },
+      bulletOrder: [{ entry: "0.0", order: [2, 0, 1] }],
+      lineEdits: [{ id: "0.0.0", after: "Owned the Word Splitter LLM feature end to end", reason: "LLM" }],
+      removeBullets: [{ id: "0.0.1", reason: "Weakest for this job" }],
+      addBullets: [{ entry: "0.0", position: 0, text: "Worked with teachers to check the engine's output", reason: "SME collaboration" }],
+    });
+    expect(content.sections[0]).toEqual({ title: "Software Engineer shipping production LLM features", entries: [], lines: ["Software Engineer who built a production Claude pipeline."] });
+    expect(content.sections[1]!.entries[0]!.bullets).toEqual([
+      "Worked with teachers to check the engine's output",
+      "Integrated submit/poll APIs and caching designed by a senior engineer",
+      "Owned the Word Splitter LLM feature end to end",
+    ]);
+    expect(changes.map((c) => c.id)).toEqual(["0.L0", "1.0.order", "1.0.2", "1.0.1.removed", "1.0.0"]);
+    expect(changes.find((c) => c.id === "1.0.1.removed")).toMatchObject({ before: "Built the Claude pipeline with prompts, structured output and validation", after: "(removed)" });
+  });
+
+  it("falls back to 'Professional Overview' for a long or symbol-laden headline, and never empties a role", () => {
+    expect(summaryTitle("Engineer | AI ★")).toBe("Professional Overview");
+    expect(summaryTitle("One two three four five six seven eight nine ten")).toBe("Professional Overview");
+    expect(summaryTitle("Forward Deployed Engineer")).toBe("Forward Deployed Engineer");
+    const base = parseResume(FIXTURE_RESUME);
+    const { notes } = applyPlan(base, { lineEdits: [], bulletOrder: [], removeBullets: [{ id: "1.0.0", reason: "x" }] });
+    expect(notes).toEqual(['Ignored removing "1.0.0".']); // Education has one entry with one bullet at most
+  });
+});
 
 describe("resume format", () => {
   it("round-trips through text", () => {

@@ -175,13 +175,15 @@ export function SubmitPanel({ app, onChanged }: { app: ApplicationDetail; onChan
     );
   }
 
+  const copyMode = report?.mode === "copy";
   return (
     <div className="w-full space-y-4">
       <div className="space-y-1">
         <h3 className="text-lg font-semibold">Submit</h3>
         <p className="text-[15px] text-ink-soft">
-          Opens the real application form in a browser window and fills in what it can. You check everything and press Submit there yourself. The app
-          never submits, and it never touches a CAPTCHA.
+          {copyMode
+            ? "For this site you apply in your own browser, with every answer prepared below."
+            : "Opens the real application form in a browser window and fills in what it can. You check everything and press Submit there yourself. The app never submits, and it never touches a CAPTCHA."}
         </p>
       </div>
       {missingProfile && (
@@ -190,14 +192,40 @@ export function SubmitPanel({ app, onChanged }: { app: ApplicationDetail; onChan
         </p>
       )}
       <div className="flex flex-wrap gap-2">
-        <button className="btn-primary" disabled={busy || session?.state === "opening"} onClick={() => run(async () => setSession(await api.openToSubmit(app.id)))}>
-          {session?.state === "opening" ? "Opening and filling…" : session?.state === "open" ? "Show the form window" : report ? "Open and prefill again" : "Open and prefill"}
+        <button className={copyMode ? "btn-quiet" : "btn-primary"} disabled={busy || session?.state === "opening"} onClick={() => run(async () => setSession(await api.openToSubmit(app.id)))}>
+          {session?.state === "opening"
+            ? copyMode || !report ? "Reading the form…" : "Opening and filling…"
+            : session?.state === "open"
+              ? "Show the form window"
+              : copyMode
+                ? "Read the form again"
+                : report
+                  ? "Open and prefill again"
+                  : "Open and prefill"}
         </button>
         <button className="btn-quiet" disabled={busy} onClick={() => run(async () => onChanged(await api.markSubmitted(app.id)))}>
           I submitted it
         </button>
-        {report?.url && <a className="btn-quiet" href={report.url} target="_blank" rel="noreferrer">Open the form in your browser</a>}
+        {report?.url && <a className={copyMode ? "btn-primary" : "btn-quiet"} href={report.url} target="_blank" rel="noreferrer">Open the form in your browser</a>}
       </div>
+      {copyMode && (
+        <div className="space-y-2 rounded-md border border-accent/40 p-3">
+          <p className="text-[15px]">
+            This site blocks automated browsers, so apply in your own browser. The app read the form and prepared every answer below, in the form's
+            order. Open the form, paste each one, attach your resume, and press Submit. Then press <span className="font-medium">I submitted it</span>.
+          </p>
+          <a className="text-[15px] font-medium text-accent underline underline-offset-2" href={`/api/applications/${app.id}/resume.pdf`} download>
+            Download your resume PDF
+          </a>
+          {(report?.prepared?.length ?? 0) > 0 && (
+            <div className="rounded-md bg-paper px-3 py-1">
+              {report!.prepared!.map((p, i) => (
+                <CopyRow key={i} label={p.label} value={p.value} />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
       {session?.state === "opening" && (
         <p className="text-[15px]">Opening the form, filling it in, and drafting answers to its open questions. This takes about half a minute.</p>
       )}
@@ -223,7 +251,7 @@ export function SubmitPanel({ app, onChanged }: { app: ApplicationDetail; onChan
         </div>
       )}
 
-      {report && (
+      {report && (report.error || required.length > 0 || report.filled.length > 0 || optional.length > 0) && (
         <div className="space-y-3 rounded-md border border-line p-3">
           {report.error && <p className="text-[15px] text-fail">{report.error}</p>}
           {required.length > 0 && (

@@ -210,7 +210,13 @@ export async function prepareApplication(db: DB, jobId: number, deps: PrepDeps, 
         changes = applied.changes;
         notes.push(...applied.notes);
         generated = result.plan.answers.map((a) => ({ ...a, source: "generated" as const }));
-        tailoring = { keywordsCovered: result.plan.keywordsCovered, keywordsMissing: result.plan.keywordsMissing, honestGaps: result.plan.honestGaps };
+        tailoring = {
+          keywordsCovered: result.plan.keywordsCovered,
+          keywordsMissing: result.plan.keywordsMissing,
+          honestGaps: result.plan.honestGaps,
+          mustHaves: result.plan.mustHaves,
+          suggestions: result.plan.suggestions,
+        };
       } catch (err) {
         if (err instanceof ScoreError && err.usage) recordUsage(db, { purpose: "tailoring", model: settings.models.tailoring, usage: err.usage, jobId, now });
         const fatal = accountProblem(err);

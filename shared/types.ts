@@ -122,6 +122,8 @@ export type Profile = {
 
 export type Settings = {
   profile: Profile;
+  /** Sites that block automated browsers: apply there in your own browser with the copy panel. ATS names or hostnames. */
+  submit: { ownBrowserFor: string[] };
   targets: {
     appsPerDay: number;
     daysPerWeek: number;
@@ -299,7 +301,7 @@ export type ApplicationDetail = ApplicationSummary & {
   hasDocx: boolean;
   prepNotes: string[];
   reviewReason: string | null; // why you rejected it
-  tailoring: { keywordsCovered: string[]; keywordsMissing: string[]; honestGaps: string[] } | null;
+  tailoring: { keywordsCovered: string[]; keywordsMissing: string[]; honestGaps: string[]; mustHaves?: string[]; suggestions?: string[] } | null;
 };
 
 export type BaseResume = {
@@ -319,6 +321,9 @@ export type Ats = "greenhouse" | "lever" | "ashby" | "other";
 export type PrefillReport = {
   ats: Ats;
   url: string;
+  /** prefill = filled in the app's window; copy = this site blocks automation, so apply in your browser from `prepared`. */
+  mode?: "prefill" | "copy";
+  prepared?: { label: string; value: string }[]; // copy mode: every answer for this form, in the form's order
   filled: { label: string; value: string }[];
   leftForYou: { label: string; reason: string; required: boolean }[];
   resumeUploaded: boolean;

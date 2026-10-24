@@ -26,6 +26,7 @@ const PROFILE_FIELDS: [keyof SettingsT["profile"], string, string][] = [
 export function Settings() {
   const [s, setS] = useState<SettingsT | null>(null);
   const [status, setStatus] = useState<{ ok: boolean; text: string } | null>(null);
+  const [sitesText, setSitesText] = useState<string | null>(null); // raw text, so typing a comma isn't eaten
 
   useEffect(() => {
     api.getSettings().then(setS);
@@ -91,6 +92,19 @@ export function Settings() {
             </div>
           ))}
         </div>
+      </fieldset>
+
+      <fieldset className="panel space-y-3 p-5">
+        <legend className="px-1 text-lg font-semibold">Apply in your own browser</legend>
+        <p className="text-[15px] text-ink-soft">
+          Sites that flag the app's automated window as spam. For these, the app reads the form and prepares every answer, and you paste them in your
+          own browser. Use ATS names (ashby, greenhouse, lever) or a website (acme.com). The app adds a site here when it sees a spam block.
+        </p>
+        <input aria-label="Sites to apply to in your own browser" className="field" value={sitesText ?? s.submit.ownBrowserFor.join(", ")}
+          onChange={(e) => {
+            setSitesText(e.target.value);
+            setS({ ...s, submit: { ownBrowserFor: e.target.value.split(",").map((x) => x.trim().toLowerCase()).filter(Boolean) } });
+          }} />
       </fieldset>
 
       <fieldset className="panel space-y-4 p-5">
