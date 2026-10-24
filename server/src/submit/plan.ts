@@ -25,7 +25,7 @@ export type FillAction =
   | { op: "fill"; id: string; label: string; value: string }
   | { op: "select"; id: string; label: string; value: string } // value = the option's text
   | { op: "check"; id: string; label: string; value: string } // id = the radio to check
-  | { op: "combobox"; id: string; label: string; value: string } // type value, pick the first matching option
+  | { op: "combobox"; id: string; label: string; value: string; match?: string } // type value, pick the option starting with match (else containing value)
   | { op: "upload"; id: string; label: string; value: string }; // value = file name shown in the report
 
 export type LeftForYou = { label: string; reason: string; required: boolean; controlId?: string };
@@ -166,6 +166,14 @@ export function planFill(controls: FormControl[], v: PrefillValues): FillPlan {
       continue;
     }
 
+    // Country (phone country or residence): she lives and works in the US.
+    if (/^(country|country of residence|phone country)$/.test(label)) {
+      const act = planAnswer(c, "United States");
+      if (act) actions.push(act);
+      else if (c.required) left('Pick "United States"');
+      continue;
+    }
+
     // Profile fields.
     const key = profileKey(label, hints, c.label);
     if (key) {
@@ -234,7 +242,7 @@ export function planAnswer(c: FormControl, answer: string): FillAction | null {
     case "combobox": {
       // Options aren't known until it opens; type the answer's first word ("Yes").
       const first = answer.trim().split(/[\s,.]+/)[0];
-      return first ? { op: "combobox", id: c.id, label, value: first } : null;
+      return first ? { op: "combobox", id: c.id, label, value: first, match: answer.trim() } : null;
     }
     default:
       return null;

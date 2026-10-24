@@ -62,6 +62,12 @@ The **resume** is one structure rendered two ways: Chromium prints the HTML temp
 
 The **Review** page shows the job, its score and gaps, each resume change as before → after, a PDF preview, the note and the answers, all editable inline. Actions: **Approve** (one application at a time), **Not applying** (with a reason, kept for tuning scoring), **Snooze**.
 
+## Filling forms in your own Chrome
+
+The recommended way to apply is the **Chrome extension** in [`extension/`](extension/README.md). You open the job in your normal Chrome, click the extension, and press **Fill this form**. It pulls the approved application from the app (contact details, resume PDF, prepared and drafted answers) and fills the page using the same matching rules as below. It asks you in its side panel about anything only you can answer, and records the submission when you press **I submitted it**. Because it's your real browser, sites that block automated browsers (like Ashby) work normally. It only acts when you press Fill, and it never submits.
+
+The extension proves it's yours with a pairing code from Settings. The server also refuses requests addressed to any host other than localhost, so a web page can't use DNS tricks to read your data.
+
 ## What Phase 4 adds
 
 **Assisted submit.** On an approved application, **Open and prefill** opens the real application form in a visible Chromium window on your machine and fills in what it can:

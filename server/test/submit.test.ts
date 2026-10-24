@@ -88,7 +88,7 @@ describe("planning the fill", () => {
       { op: "fill", id: "1", label: "First Name", value: "Minahil" },
       { op: "fill", id: "2", label: "(unlabeled field)", value: "Minahil Khan" },
       { op: "fill", id: "3", label: "Email", value: "me@example.com" },
-      { op: "combobox", id: "4", label: "Will you now or in the future require sponsorship?", value: "Yes" },
+      { op: "combobox", id: "4", label: "Will you now or in the future require sponsorship?", value: "Yes", match: "Yes" },
       { op: "select", id: "5", label: "Are you legally authorized to work in the US?", value: "Yes" },
     ]);
   });
@@ -149,6 +149,7 @@ describe.skipIf(!chromiumPath)("prefill on form layouts like Greenhouse, Lever a
     expect(await page.locator("#question_3").getAttribute("data-chosen")).toBe("Yes");
     expect(await page.locator("#question_4").getAttribute("data-chosen")).toBe("Yes");
     expect(await page.locator("#gender").getAttribute("data-chosen")).toBeNull();
+    expect(await page.locator("#country").getAttribute("data-chosen")).toBe("United States");
     expect(await page.locator("#resume").evaluate((el) => (el as HTMLInputElement).files?.[0]?.name)).toBe("Minahil_Khan_Resume.pdf");
     expect(await page.locator("#cover_letter").evaluate((el) => (el as HTMLInputElement).files?.length)).toBe(0);
     expect(r.resumeUploaded).toBe(true);
@@ -488,4 +489,55 @@ describe.skipIf(!chromiumPath)("copy mode and spam blocks through the API", () =
     expect((await req("GET", "/api/settings")).body.submit.ownBrowserFor).toEqual(["ashby", "lever"]);
     expect(db).toBeTruthy();
   }, 30000);
+});
+
+// ---- The Chrome extension's fill script, on the same form layouts ------------
+
+describe.skipIf(!chromiumPath)("extension fill script", () => {
+  let browser: Browser;
+  let bundle: string;
+  beforeAll(async () => {
+    const { build } = await import("esbuild");
+    const out = await build({ entryPoints: [path.join(__dirname, "../../extension/src/fill.ts")], bundle: true, format: "iife", write: false, target: "chrome114" });
+    bundle = out.outputFiles[0]!.text;
+    const { chromium } = await import("playwright");
+    browser = await chromium.launch({ executablePath: chromiumPath });
+  });
+  afterAll(async () => browser?.close());
+
+  const payload = { values: { ...VALUES, answers: ANSWERS.filter((a) => !/Why do you want/.test(a.question)) }, resume: { fileName: "Minahil_Khan_Resume.pdf", base64: Buffer.from("%PDF-1.4 test").toString("base64") } };
+
+  it("fills Greenhouse-style forms in the page itself, including react-select, and reports open questions", async () => {
+    const page = await browser.newPage();
+    await page.goto(`file://${path.join(FORMS, "greenhouse.html")}`);
+    await page.addScriptTag({ content: bundle });
+    const r = await page.evaluate((p) => (window as unknown as { __autopilot: { fill: (p: unknown) => Promise<unknown> } }).__autopilot.fill(p), payload) as {
+      hasForm: boolean; resumeUploaded: boolean; unanswered: { id: string; label: string }[];
+    };
+    expect(r.hasForm).toBe(true);
+    expect(r.resumeUploaded).toBe(true);
+    expect(await page.locator("#first_name").inputValue()).toBe("Minahil");
+    expect(await page.locator("#email").inputValue()).toBe("me@example.com");
+    expect(await page.locator("#question_3").getAttribute("data-chosen")).toBe("Yes");
+    expect(await page.locator("#question_4").getAttribute("data-chosen")).toBe("Yes");
+    expect(await page.locator("#resume").evaluate((el) => (el as HTMLInputElement).files?.[0]?.name)).toBe("Minahil_Khan_Resume.pdf");
+    expect(r.unanswered.map((u) => u.label)).toContain("Why do you want to work at Acme?");
+    // A drafted answer, put into that one field.
+    const why = r.unanswered.find((u) => u.label === "Why do you want to work at Acme?")!;
+    const ok = await page.evaluate(([id, v]) => (window as unknown as { __autopilot: { fillOne: (i: string, v: string) => Promise<boolean> } }).__autopilot.fillOne(id!, v!), [why.id, "Because of the customers."]);
+    expect(ok).toBe(true);
+    expect(await page.locator("#question_6").inputValue()).toBe("Because of the customers.");
+    expect(await page.evaluate(() => (window as { __submitted?: boolean }).__submitted ?? false)).toBe(false);
+  });
+
+  it("fills Lever-style radios and selects", async () => {
+    const page = await browser.newPage();
+    await page.goto(`file://${path.join(FORMS, "lever.html")}`);
+    await page.addScriptTag({ content: bundle });
+    await page.evaluate((p) => (window as unknown as { __autopilot: { fill: (p: unknown) => Promise<unknown> } }).__autopilot.fill(p), payload);
+    expect(await page.locator("input[name=name]").inputValue()).toBe("Minahil Khan");
+    expect(await page.locator("input[name='cards[a][field0]'][value=Yes]").isChecked()).toBe(true);
+    expect(await page.locator("select[name='cards[a][field1]']").inputValue()).toBe("Yes");
+    expect(await page.locator("textarea[name=comments]").inputValue()).toBe("I ship production Claude features.");
+  });
 });

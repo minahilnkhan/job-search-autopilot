@@ -404,3 +404,107 @@ export function resetSubmitSessions() {
   for (const s of sessions.values()) if (s.timer) clearInterval(s.timer);
   sessions.clear();
 }
+
+// ---- Chrome extension: filling in your own browser -----------------------------
+
+/** Approved applications, best match for the page you're on first. */
+export function matchApplications(db: DB, pageUrl: string) {
+  const rows = db
+    .select({ id: applications.id, status: applications.status, title: jobs.title, company: companies.name, source: jobs.source, externalId: jobs.externalId, url: jobs.url, token: companies.atsBoardToken })
+    .from(applications)
+    .innerJoin(jobs, eq(applications.jobId, jobs.id))
+    .innerJoin(companies, eq(jobs.companyId, companies.id))
+    .where(eq(applications.status, "approved"))
+    .orderBy(desc(applications.id))
+    .all();
+  let page: URL | null = null;
+  try {
+    page = new URL(pageUrl);
+  } catch {
+    page = null;
+  }
+  const score = (r: (typeof rows)[number]) => {
+    if (!page) return 0;
+    const urls = [applyTarget(r, r.token)?.url, r.url].filter((u): u is string => !!u);
+    let best = 0;
+    for (const u of urls) {
+      let t: URL;
+      try {
+        t = new URL(u);
+      } catch {
+        continue;
+      }
+      const sameHost = t.hostname.replace(/^www\./, "") === page.hostname.replace(/^www\./, "");
+      if (r.externalId && page.href.includes(r.externalId)) best = Math.max(best, sameHost ? 3 : 2);
+      else if (sameHost && page.pathname.startsWith(t.pathname.replace(/\/(apply|application)\/?$/, ""))) best = Math.max(best, 2);
+    }
+    return best;
+  };
+  const scored = rows.map((r) => ({ id: r.id, jobTitle: r.title, companyName: r.company, score: score(r) })).sort((a, b) => b.score - a.score);
+  const top = scored.filter((r) => r.score > 0 && r.score === scored[0]!.score);
+  return { best: top.length === 1 ? top[0]!.id : null, applications: scored.map(({ score: _s, ...r }) => r) };
+}
+
+/** What the extension needs to fill the form: your details, prepared answers, note, and the resume file. */
+export function extensionPayload(db: DB, id: number) {
+  const app = getApplication(db, id);
+  if (app.status !== "approved") throw new ConflictError("Approve the application in Review first.");
+  const settings = getSettings(db);
+  const f = applicationFile(db, id, "pdf");
+  return {
+    applicationId: id,
+    jobTitle: app.jobTitle,
+    companyName: app.companyName,
+    values: { profile: settings.profile, answers: app.answers, recruiterNote: app.recruiterNote, resumeFileName: f.filename },
+    resume: { fileName: f.filename, base64: fs.readFileSync(f.path).toString("base64") },
+  };
+}
+
+/**
+ * Questions on the page nothing prepared covers: draft answers (Truth-Checked)
+ * or turn them into questions for you. The questions also appear in the app's
+ * "Questions for you" chat for this application.
+ */
+export async function extensionQuestions(db: DB, id: number, deps: SubmitDeps, controls: FormControl[], pageUrl: string) {
+  const app = getApplication(db, id);
+  if (app.status !== "approved") throw new ConflictError("Approve the application in Review first.");
+  const drafted: Answer[] = [];
+  const out = controls.length ? await questionHandler(db, id, deps, getSettings(db), drafted)(controls) : { answers: [], asks: [] };
+  if (drafted.length) saveAnswers(db, id, drafted);
+  const asks: SubmitAsk[] = out.asks.map((q, i) => {
+    const c = controls.find((x) => x.id === q.controlId)!;
+    return { id: `ask-${i + 1}`, label: clean(c.label), question: q.question, draft: q.draft, required: c.required, answer: null, filled: false, controlKey: c.id };
+  });
+  const report: PrefillReport = {
+    ats: "other",
+    url: pageUrl,
+    mode: "extension",
+    filled: [],
+    leftForYou: [],
+    resumeUploaded: false,
+    notices: [],
+    asks,
+    error: null,
+    at: Date.now(),
+  };
+  db.update(applications).set({ prefillReport: report, lastActivityAt: new Date() }).where(eq(applications.id, id)).run();
+  sessions.delete(id); // the app's own window isn't involved
+  return { answers: out.answers, asks };
+}
+
+/** The extension's account of what it filled, saved so Review shows it. */
+export function saveExtensionReport(db: DB, id: number, r: Pick<PrefillReport, "filled" | "leftForYou" | "resumeUploaded" | "notices">) {
+  const app = getApplication(db, id);
+  const prev = app.prefillReport;
+  const report: PrefillReport = {
+    ats: prev?.ats ?? "other",
+    url: prev?.url ?? "",
+    mode: "extension",
+    asks: prev?.mode === "extension" ? (prev.asks ?? []) : [],
+    error: null,
+    at: Date.now(),
+    ...r,
+  };
+  db.update(applications).set({ prefillReport: report, lastActivityAt: new Date() }).where(eq(applications.id, id)).run();
+  return report;
+}

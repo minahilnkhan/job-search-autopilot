@@ -23,6 +23,46 @@ const PROFILE_FIELDS: [keyof SettingsT["profile"], string, string][] = [
   ["website", "Website or portfolio (optional)", "text"],
 ];
 
+/** Pairing code and setup steps for the Chrome extension. */
+function ExtensionSetup() {
+  const [code, setCode] = useState<string | null>(null);
+  const [shown, setShown] = useState(false);
+  const [copied, setCopied] = useState(false);
+  useEffect(() => {
+    api.pairingCode().then((r) => setCode(r.code)).catch(() => {});
+  }, []);
+  return (
+    <fieldset className="panel space-y-3 p-5">
+      <legend className="px-1 text-lg font-semibold">Chrome extension</legend>
+      <p className="text-[15px] text-ink-soft">
+        Fills application forms in your own Chrome, so sites treat it like you. You still review and press Submit. One-time setup:
+      </p>
+      <ol className="list-decimal space-y-1 pl-5 text-[15px]">
+        <li>In Chrome, go to <code>chrome://extensions</code> and turn on <span className="font-medium">Developer mode</span> (top right).</li>
+        <li>Press <span className="font-medium">Load unpacked</span> and choose the <code>extension</code> folder inside <code>job-autoload</code>.</li>
+        <li>Pin it (the puzzle-piece icon → pin), click it, and paste this pairing code:</li>
+      </ol>
+      <div className="flex flex-wrap items-center gap-2">
+        <code className="rounded-md border border-line bg-paper px-3 py-1.5 text-[15px]">{code ? (shown ? code : "•".repeat(16)) : "…"}</code>
+        <button type="button" className="btn-quiet py-1" onClick={() => setShown((v) => !v)}>{shown ? "Hide" : "Show"}</button>
+        <button type="button" className="btn-quiet py-1" disabled={!code}
+          onClick={async () => {
+            await navigator.clipboard.writeText(code!).catch(() => {});
+            setCopied(true);
+            setTimeout(() => setCopied(false), 1500);
+          }}>
+          {copied ? "Copied" : "Copy"}
+        </button>
+        <button type="button" className="btn-quiet py-1" onClick={() => api.newPairingCode().then((r) => setCode(r.code))}>Make a new code</button>
+      </div>
+      <p className="text-sm text-ink-soft">
+        The code is how the app knows a request comes from your extension. A new code unpairs the old one. The app rebuilds the extension each time you
+        run <code>npm run dev</code>; after pulling an update, press the reload icon on the extension in <code>chrome://extensions</code>.
+      </p>
+    </fieldset>
+  );
+}
+
 export function Settings() {
   const [s, setS] = useState<SettingsT | null>(null);
   const [status, setStatus] = useState<{ ok: boolean; text: string } | null>(null);
@@ -93,6 +133,8 @@ export function Settings() {
           ))}
         </div>
       </fieldset>
+
+      <ExtensionSetup />
 
       <fieldset className="panel space-y-3 p-5">
         <legend className="px-1 text-lg font-semibold">Apply in your own browser</legend>

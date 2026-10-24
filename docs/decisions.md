@@ -190,3 +190,12 @@ Ashby rejected a submission from the automated window as "possible spam". Making
 
 ### Deleting jobs is a soft delete
 The Jobs page can select one, several or all jobs in the current view and delete them. A deleted job keeps its row (with `deleted_at`) so the daily fetch's dedupe still sees it and doesn't add the same posting back; it's hidden everywhere and never scored. Applications that weren't submitted are withdrawn with it ("Job deleted"); jobs with a submitted application are kept, because the Tracker needs them. Pasting a deleted job again brings it back.
+
+### The Chrome extension, not a disguised browser
+Sites like Ashby block the app's automated window. Making that window look human is bot-detection bypass, which the spec rules out. Driving her real Chrome over the remote-debugging port would expose every signed-in site to anything on the machine. A Chrome extension is the sanctioned way to type into pages: it runs only when she presses Fill, in her own browser, and it's the same thing autofill tools and password managers do.
+
+- **Same rules as the app.** The form reader and the matching plan are shared code (`server/src/submit/describe.ts`, `plan.ts`), bundled into the extension with esbuild, so both paths fill the same way and the same tests cover them.
+- **Side panel, not popup.** A popup closes as soon as you click into the page, which would lose the questions chat mid-application.
+- **Pairing code.** Extension requests carry a random code from Settings (compared in constant time); a new code unpairs the old one. **Host check.** The server answers only requests addressed to localhost, which blocks DNS rebinding.
+- **Permissions.** Greenhouse, Lever and Ashby up front; other sites only after "Allow on this site" (optional host permission requested on her click).
+- **Dropdowns.** It picks the option that starts with the whole answer ("United States") before any option merely containing the typed word, so "United" doesn't land on United Arab Emirates.

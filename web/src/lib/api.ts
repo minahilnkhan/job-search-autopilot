@@ -61,6 +61,8 @@ export const api = {
   updateCompany: (id: number, body: Partial<Company>) =>
     request<{ company: Company; refilteredJobs: number }>("PATCH", `/api/companies/${id}`, body),
   deleteJobs: (ids: number[]) => request<{ deleted: number; kept: { id: number; title: string; reason: string }[] }>("POST", "/api/jobs/delete", { ids }),
+  pairingCode: () => request<{ code: string }>("GET", "/api/extension-pairing"),
+  newPairingCode: () => request<{ code: string }>("POST", "/api/extension-pairing/new", {}),
   getSettings: () => request<Settings>("GET", "/api/settings"),
   saveSettings: (body: Settings) => request<Settings>("PUT", "/api/settings", body),
   runPipeline: () => request<{ started: boolean }>("POST", "/api/pipeline/run", {}),

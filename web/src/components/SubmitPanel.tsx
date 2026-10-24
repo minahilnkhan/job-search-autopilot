@@ -142,6 +142,16 @@ export function SubmitPanel({ app, onChanged }: { app: ApplicationDetail; onChan
     return () => clearInterval(t);
   }, [live, app.id, app.status, onChanged]);
 
+  // The extension can mark it submitted from your browser; notice that here.
+  useEffect(() => {
+    if (app.status !== "approved") return;
+    const t = setInterval(async () => {
+      const fresh = await api.application(app.id).catch(() => null);
+      if (fresh && (fresh.status !== app.status || fresh.prefillReport?.at !== app.prefillReport?.at)) onChanged(fresh);
+    }, 5000);
+    return () => clearInterval(t);
+  }, [app.id, app.status, app.prefillReport?.at, onChanged]);
+
   async function run(fn: () => Promise<void>) {
     setBusy(true);
     setError(null);
@@ -183,7 +193,7 @@ export function SubmitPanel({ app, onChanged }: { app: ApplicationDetail; onChan
         <p className="text-[15px] text-ink-soft">
           {copyMode
             ? "For this site you apply in your own browser, with every answer prepared below."
-            : "Opens the real application form in a browser window and fills in what it can. You check everything and press Submit there yourself. The app never submits, and it never touches a CAPTCHA."}
+            : "The form gets filled in for you; you check everything and press Submit yourself. Nothing is ever submitted for you, and CAPTCHAs are left to you."}
         </p>
       </div>
       {missingProfile && (
@@ -191,23 +201,41 @@ export function SubmitPanel({ app, onChanged }: { app: ApplicationDetail; onChan
           Add your name, email and phone in <a className="font-medium underline underline-offset-2" href="#/settings">Settings → Profile</a> first, or those fields stay blank.
         </p>
       )}
-      <div className="flex flex-wrap gap-2">
-        <button className={copyMode ? "btn-quiet" : "btn-primary"} disabled={busy || session?.state === "opening"} onClick={() => run(async () => setSession(await api.openToSubmit(app.id)))}>
-          {session?.state === "opening"
-            ? copyMode || !report ? "Reading the form…" : "Opening and filling…"
-            : session?.state === "open"
-              ? "Show the form window"
-              : copyMode
-                ? "Read the form again"
-                : report
-                  ? "Open and prefill again"
-                  : "Open and prefill"}
-        </button>
-        <button className="btn-quiet" disabled={busy} onClick={() => run(async () => onChanged(await api.markSubmitted(app.id)))}>
-          I submitted it
-        </button>
-        {report?.url && <a className={copyMode ? "btn-primary" : "btn-quiet"} href={report.url} target="_blank" rel="noreferrer">Open the form in your browser</a>}
+      <div className="space-y-2 rounded-md border border-accent/40 p-3">
+        <p className="font-medium">Fill it in your own Chrome (recommended)</p>
+        <ol className="list-decimal space-y-0.5 pl-5 text-[15px]">
+          <li>Press <span className="font-medium">Open in my browser</span>.</li>
+          <li>Click the Job Search Autopilot extension in Chrome's toolbar and press <span className="font-medium">Fill this form</span>.</li>
+          <li>Answer any questions it asks, check the form, and press Submit on the page.</li>
+          <li>Press <span className="font-medium">I submitted it</span> (in the extension or here).</li>
+        </ol>
+        <div className="flex flex-wrap gap-2">
+          {(app.applyUrl ?? report?.url) && (
+            <a className="btn-primary" href={(app.applyUrl ?? report?.url)!} target="_blank" rel="noreferrer">Open in my browser</a>
+          )}
+          <button className="btn-quiet" disabled={busy} onClick={() => run(async () => onChanged(await api.markSubmitted(app.id)))}>
+            I submitted it
+          </button>
+        </div>
+        <p className="text-sm text-ink-soft">
+          No extension yet? Set it up once in <a className="underline underline-offset-2" href="#/settings">Settings → Chrome extension</a>.
+        </p>
       </div>
+      <details className="text-[15px]">
+        <summary className="cursor-pointer text-ink-soft">Other ways: the app's own window, or prepared answers to paste</summary>
+        <div className="mt-2 flex flex-wrap gap-2">
+          <button className="btn-quiet" disabled={busy || session?.state === "opening"} onClick={() => run(async () => setSession(await api.openToSubmit(app.id)))}>
+            {session?.state === "opening"
+              ? copyMode || !report ? "Reading the form…" : "Opening and filling…"
+              : session?.state === "open"
+                ? "Show the form window"
+                : copyMode
+                  ? "Read the form again"
+                  : "Fill in the app's window"}
+          </button>
+        </div>
+        <p className="mt-1 text-sm text-ink-soft">The app's window is automated, so some sites (like Ashby) block it; for those it prepares every answer for you to paste instead.</p>
+      </details>
       {copyMode && (
         <div className="space-y-2 rounded-md border border-accent/40 p-3">
           <p className="text-[15px]">

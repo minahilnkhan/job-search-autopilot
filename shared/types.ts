@@ -292,6 +292,7 @@ export type ApplicationDetail = ApplicationSummary & {
   recruiterNote: string | null;
   noteBasis: NoteBasis | null;
   prefillReport: PrefillReport | null;
+  applyUrl: string | null; // the application form, for "Open in my browser"
   submittedAt: number | null;
   followUpDue: string | null;
   answers: Answer[];
@@ -322,7 +323,7 @@ export type PrefillReport = {
   ats: Ats;
   url: string;
   /** prefill = filled in the app's window; copy = this site blocks automation, so apply in your browser from `prepared`. */
-  mode?: "prefill" | "copy";
+  mode?: "prefill" | "copy" | "extension"; // extension = filled by the Chrome extension in your own browser
   prepared?: { label: string; value: string }[]; // copy mode: every answer for this form, in the form's order
   filled: { label: string; value: string }[];
   leftForYou: { label: string; reason: string; required: boolean }[];
@@ -342,6 +343,7 @@ export type SubmitAsk = {
   required: boolean;
   answer: string | null; // your reply, once given
   filled: boolean; // typed into the open form
+  controlKey?: string; // extension: which field on the page this is for
 };
 
 export type SubmitSession = {

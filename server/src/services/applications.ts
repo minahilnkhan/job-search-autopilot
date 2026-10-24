@@ -6,6 +6,7 @@ import { applications, companies, jobs, resumeVersions } from "../db/schema";
 import { config } from "../config";
 import { removeLine, resumeLines, serializeResume, setLine } from "../domain/resumeFormat";
 import { applyPlan, chooseBase, resumeForPrompt } from "../domain/tailorPlan";
+import { applyTarget } from "../submit/applyUrl";
 import { runTruthCheck, type CheckLine } from "../domain/truthCheck";
 import { assertTransition } from "../domain/applicationStatus";
 import type { InventoryFacts } from "../domain/inventory";
@@ -298,7 +299,7 @@ export function listApplications(db: DB, view: QueueView, now = new Date()): App
 
 export function getApplication(db: DB, id: number): ApplicationDetail {
   const row = db
-    .select({ app: applications, job: jobs, companyName: companies.name })
+    .select({ app: applications, job: jobs, companyName: companies.name, companyToken: companies.atsBoardToken })
     .from(applications)
     .innerJoin(jobs, eq(applications.jobId, jobs.id))
     .innerJoin(companies, eq(jobs.companyId, companies.id))
@@ -316,6 +317,7 @@ export function getApplication(db: DB, id: number): ApplicationDetail {
     recruiterNote: row.app.recruiterNote,
     noteBasis: row.app.noteBasis ?? null,
     prefillReport: row.app.prefillReport ?? null,
+    applyUrl: applyTarget(row.job, row.companyToken)?.url ?? null,
     submittedAt: row.app.submittedAt?.getTime() ?? null,
     followUpDue: row.app.followUpDue ?? null,
     answers: row.app.answers ?? [],

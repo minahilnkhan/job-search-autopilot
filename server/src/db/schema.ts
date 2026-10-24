@@ -251,6 +251,8 @@ export const settings = sqliteTable("settings", {
     .$type<Settings["pipeline"]>()
     .notNull()
     .default(DEFAULT_SETTINGS.pipeline),
+  // Pairing code for the Chrome extension (sent as X-Autopilot-Token).
+  extensionToken: text("extension_token"),
   submit: text("submit", { mode: "json" }).$type<Settings["submit"]>().notNull().default(DEFAULT_SETTINGS.submit),
   profile: text("profile", { mode: "json" }).$type<Settings["profile"]>().notNull().default(DEFAULT_SETTINGS.profile),
   standardAnswers: text("standard_answers", { mode: "json" })

@@ -7,6 +7,7 @@ import { settingsRoutes } from "./routes/settings";
 import { pipelineRoutes } from "./routes/pipeline";
 import { applicationRoutes } from "./routes/applications";
 import { submissionRoutes } from "./routes/submissions";
+import { extensionRoutes } from "./routes/extension";
 import type { SubmitDeps } from "./services/submissions";
 import type { PrepDeps } from "./services/applications";
 import { TransitionError } from "./domain/applicationStatus";
@@ -39,6 +40,13 @@ export function buildApp(
     return reply.code(500).send({ error: "Internal error" });
   });
 
+  // Only answer requests addressed to this machine. Blocks DNS-rebinding,
+  // where a web page points its own domain at 127.0.0.1 to read the API.
+  app.addHook("onRequest", async (req, reply) => {
+    const host = (req.headers.host ?? "").replace(/:\d+$/, "").toLowerCase();
+    if (!["localhost", "127.0.0.1", "[::1]"].includes(host)) return reply.code(403).send({ error: "Forbidden" });
+  });
+
   app.get("/api/health", async () => ({ ok: true }));
   jobRoutes(app, db);
   companyRoutes(app, db);
@@ -46,5 +54,6 @@ export function buildApp(
   pipelineRoutes(app, db, opts.pipeline);
   applicationRoutes(app, db, opts.prep);
   submissionRoutes(app, db, opts.submit);
+  extensionRoutes(app, db, opts.submit);
   return app;
 }

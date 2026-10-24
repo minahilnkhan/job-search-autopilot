@@ -1,0 +1,18 @@
+{
+  "manifest_version": 3,
+  "name": "Job Search Autopilot: Fill",
+  "version": "1.0.0",
+  "description": "Fills job application forms in your own Chrome from your local Job Search Autopilot app. You review and submit.",
+  "action": { "default_title": "Job Search Autopilot" },
+  "side_panel": { "default_path": "panel.html" },
+  "background": { "service_worker": "dist/background.js" },
+  "permissions": ["sidePanel", "storage", "scripting", "activeTab", "webNavigation"],
+  "host_permissions": [
+    "http://127.0.0.1:3001/*",
+    "http://localhost:3001/*",
+    "https://*.greenhouse.io/*",
+    "https://jobs.lever.co/*",
+    "https://*.ashbyhq.com/*"
+  ],
+  "optional_host_permissions": ["https://*/*"]
+}

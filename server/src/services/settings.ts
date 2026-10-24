@@ -7,7 +7,7 @@ import type { Settings } from "../../../shared/types";
 export function getSettings(db: DB): Settings {
   const row = db.select().from(settings).where(eq(settings.id, 1)).get();
   if (!row) return DEFAULT_SETTINGS;
-  const { id: _id, ...rest } = row;
+  const { id: _id, extensionToken: _t, ...rest } = row;
   // Fill keys added after the row was first saved (JSON columns don't migrate per key).
   // Keep only known keys (an older row may still carry minFitScore).
   const { tierAPicks, tierBPicks, maxAgeDays, preferredCityBoost } = { ...DEFAULT_SETTINGS.shortlist, ...rest.shortlist };

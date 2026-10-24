@@ -12,15 +12,18 @@
   "scripts": {
     "dev": "concurrently -n server,web -c blue,green \"npm run dev -w server\" \"npm run dev -w web\"",
     "test": "npm test -w server",
-    "typecheck": "npm run typecheck -w server && npm run typecheck -w web",
+    "typecheck": "npm run typecheck -w server && npm run typecheck -w web && tsc -p extension",
     "db:migrate": "npm run db:migrate -w server",
     "db:seed": "npm run db:seed -w server",
     "setup": "npm run db:migrate && npm run db:seed",
     "pipeline": "npm run pipeline -w server",
     "db:studio": "npm run db:studio -w server",
-    "setup:pdf": "playwright install chromium"
+    "setup:pdf": "playwright install chromium",
+    "build:extension": "node extension/build.mjs",
+    "predev": "npm run build:extension"
   },
   "devDependencies": {
+    "@types/chrome": "^0.0.287",
     "concurrently": "^9.2.1"
   }
 }

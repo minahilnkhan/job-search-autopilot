@@ -1,0 +1,21 @@
+:root { --ink: #1d2433; --soft: #4a5468; --paper: #f3f5f8; --line: #d5dbe4; --accent: #2f4bd8; --pass: #1f7a4d; --fail: #b42318; --warn: #8a5600; --warn-bg: #fdf3dc; }
+* { box-sizing: border-box; }
+body { margin: 0; padding: 14px; font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; color: var(--ink); background: #fff; }
+h1 { font-size: 16px; margin: 0; }
+h2 { font-size: 14px; margin: 14px 0 6px; }
+p { margin: 6px 0; }
+.soft { color: var(--soft); }
+.pass { color: var(--pass); }
+.fail { color: var(--fail); }
+.notice { background: var(--warn-bg); color: var(--warn); padding: 8px 10px; border-radius: 6px; }
+button { font: inherit; font-weight: 600; border-radius: 6px; padding: 7px 12px; border: 1px solid var(--line); background: #fff; color: var(--ink); cursor: pointer; }
+button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+button:disabled { opacity: .5; cursor: default; }
+input[type=text], input[type=password], textarea, select { width: 100%; font: inherit; padding: 7px 9px; border: 1px solid var(--line); border-radius: 6px; }
+.row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin: 10px 0; }
+.card { border: 1px solid var(--line); border-radius: 8px; padding: 10px; margin: 10px 0; }
+ul { margin: 4px 0; padding-left: 18px; }
+.bubble { background: var(--paper); border-radius: 8px 8px 8px 2px; padding: 8px 10px; margin: 8px 0 6px; }
+.bubble small { color: var(--soft); display: block; }
+.mine { background: var(--accent); color: #fff; border-radius: 8px 8px 2px 8px; padding: 8px 10px; margin: 6px 0 2px auto; max-width: 90%; width: fit-content; }
+label.check { display: flex; gap: 6px; align-items: center; color: var(--soft); font-size: 13px; }
