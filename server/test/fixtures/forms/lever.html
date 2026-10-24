@@ -1,0 +1,26 @@
+<!doctype html><html><head><meta charset="utf-8"></head><body>
+<form id="application-form" method="POST" action="/apply">
+<ul>
+  <li class="application-question resume"><label><div class="application-label">Resume/CV <span class="required">✱</span></div><div class="application-field"><input type="file" name="resume" id="resume-upload-input"></div></label></li>
+  <li class="application-question"><label><div class="application-label">Full name<span class="required">✱</span></div><div class="application-field"><input type="text" name="name" required></div></label></li>
+  <li class="application-question"><label><div class="application-label">Email<span class="required">✱</span></div><div class="application-field"><input type="email" name="email" required></div></label></li>
+  <li class="application-question"><label><div class="application-label">Phone</div><div class="application-field"><input type="text" name="phone"></div></label></li>
+  <li class="application-question"><label><div class="application-label">Current location</div><div class="application-field"><input type="text" name="location"></div></label></li>
+  <li class="application-question"><label><div class="application-label">Current company</div><div class="application-field"><input type="text" name="org"></div></label></li>
+  <li class="application-question"><label><div class="application-label">LinkedIn URL</div><div class="application-field"><input type="text" name="urls[LinkedIn]"></div></label></li>
+  <li class="application-question"><label><div class="application-label">GitHub URL</div><div class="application-field"><input type="text" name="urls[GitHub]"></div></label></li>
+  <li class="application-question custom-question"><div class="application-label">Are you authorized to work in the US?<span class="required">✱</span></div>
+    <ul><li><label><input type="radio" name="cards[a][field0]" value="Yes" required><span>Yes</span></label></li><li><label><input type="radio" name="cards[a][field0]" value="No"><span>No</span></label></li></ul></li>
+  <li class="application-question custom-question"><div class="application-label">Will you require visa sponsorship now or in the future?<span class="required">✱</span></div>
+    <select name="cards[a][field1]" required><option value="">Select...</option><option>Yes</option><option>No</option></select></li>
+  <li class="application-question custom-question"><div class="application-label">Are you willing to relocate?</div>
+    <ul><li><label><input type="radio" name="cards[a][field2]" value="Yes"><span>Yes</span></label></li><li><label><input type="radio" name="cards[a][field2]" value="No"><span>No</span></label></li></ul></li>
+  <li class="application-question custom-question"><label><div class="application-label">I confirm the information above is accurate<span class="required">✱</span></div><input type="checkbox" name="cards[a][field3]" required></label></li>
+  <li class="application-question"><label><div class="application-label">Additional information</div><textarea name="comments" placeholder="Add a cover letter or anything else you want to share."></textarea></label></li>
+  <li class="application-question"><label><div class="application-label">Gender</div><select name="eeo[gender]"><option value="">Select ...</option><option>Female</option><option>Male</option></select></label></li>
+</ul>
+<div class="h-captcha"><textarea name="h-captcha-response" style="display:none"></textarea></div>
+<button type="submit" id="btn-submit">Submit application</button>
+</form>
+<script src="combobox.js"></script>
+</body></html>

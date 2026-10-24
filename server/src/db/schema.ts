@@ -10,6 +10,7 @@ import {
 } from "drizzle-orm/sqlite-core";
 import type {
   NoteBasis,
+  PrefillReport,
   Answer,
   ExtractedFields,
   ResumeChange,
@@ -142,6 +143,8 @@ export const applications = sqliteTable(
     tailoring: text("tailoring", { mode: "json" }).$type<{ keywordsCovered: string[]; keywordsMissing: string[]; honestGaps: string[] }>(),
     // What the recruiter note was built around, so you can judge and edit it.
     noteBasis: text("note_basis", { mode: "json" }).$type<NoteBasis>(),
+    // Phase 4: what the assisted-submit prefill filled and left for you.
+    prefillReport: text("prefill_report", { mode: "json" }).$type<PrefillReport>(),
     createdAt: createdAt(),
   },
   (t) => [index("applications_job_idx").on(t.jobId)]
@@ -246,6 +249,7 @@ export const settings = sqliteTable("settings", {
     .$type<Settings["pipeline"]>()
     .notNull()
     .default(DEFAULT_SETTINGS.pipeline),
+  profile: text("profile", { mode: "json" }).$type<Settings["profile"]>().notNull().default(DEFAULT_SETTINGS.profile),
   standardAnswers: text("standard_answers", { mode: "json" })
     .$type<Settings["standardAnswers"]>()
     .notNull()

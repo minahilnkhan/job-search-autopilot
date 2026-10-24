@@ -1,0 +1,2 @@
+ALTER TABLE `applications` ADD `prefill_report` text;--> statement-breakpoint
+ALTER TABLE `settings` ADD `profile` text DEFAULT '{"firstName":"","lastName":"","email":"","phone":"","location":"Chicago, IL","linkedin":"","github":"","website":"","currentCompany":"Yabla"}' NOT NULL;

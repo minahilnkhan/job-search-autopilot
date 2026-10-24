@@ -6,7 +6,7 @@ const NEXT: Record<ApplicationStatus, ApplicationStatus[]> = {
   draft: ["ready_for_review", "withdrawn"],
   ready_for_review: ["approved", "draft", "withdrawn"],
   approved: ["submitted", "ready_for_review", "withdrawn"], // back to review = un-approve before submitting
-  submitted: ["screen", "interview", "rejected", "ghosted", "withdrawn"],
+  submitted: ["screen", "interview", "rejected", "ghosted", "withdrawn", "approved"], // approved = undo a mistaken "submitted"
   screen: ["interview", "offer", "rejected", "ghosted", "withdrawn"],
   interview: ["offer", "rejected", "ghosted", "withdrawn"],
   offer: ["withdrawn"],

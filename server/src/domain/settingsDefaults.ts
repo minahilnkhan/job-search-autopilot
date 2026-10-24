@@ -2,6 +2,18 @@ import type { Settings } from "../../../shared/types";
 
 // Defaults come from job-mentor-prompt.md. Everything is editable on the Settings page.
 export const DEFAULT_SETTINGS: Settings = {
+  // For prefilling application forms. Fill in on the Settings page.
+  profile: {
+    firstName: "",
+    lastName: "",
+    email: "",
+    phone: "",
+    location: "Chicago, IL",
+    linkedin: "",
+    github: "",
+    website: "",
+    currentCompany: "Yabla",
+  },
   targets: {
     appsPerDay: 10,
     daysPerWeek: 6,

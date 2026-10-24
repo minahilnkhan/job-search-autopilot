@@ -148,3 +148,28 @@ Tier A tailoring takes 20–40 seconds, and the deck shouldn't wait on it. The s
 
 ### One note writer, with a brief and a visible basis
 Tier A notes used to come from the tailoring call as a side job, with a one-line instruction. Now every note comes from one writer (`llm/note.ts`) with a real brief: who she is in a line, one company value taken from the posting (or company notes) and shown through a specific inventory story without naming it, one memorable detail, soft skills shown by actions, and AI-first as a plain fact. The model also returns what it built the note around (value, the posting's words, story, standout), stored as `note_basis` and shown above the note, so you can judge it quickly and redraft if it picked the wrong angle. Still capped at 99 words by the Truth Check. That's tight for five ideas, so the brief asks for them woven into 3–4 sentences, not listed. Tailoring no longer writes a note, which saves output tokens.
+
+## Phase 4
+
+### Prefill only; you press Submit
+The spec rules out auto-submit, and the code has no path to it: the prefill never clicks a button. Submission is detected from the confirmation page (URL like `/confirmation` or `/thanks`, or "thank you for applying" text near the top of the page), or you mark it by hand. A wrong "submitted" can be undone (`submitted → approved` is the one backwards move in the status whitelist, for exactly that).
+
+### Go straight to the ATS's form
+For job-board jobs the app opens `job-boards.greenhouse.io/{board}/jobs/{id}`, `jobs.lever.co/{board}/{id}/apply` or `jobs.ashbyhq.com/{board}/{id}/application`, built from data the fetchers already store, instead of the posting's link. Careers pages often embed the form in an iframe or redirect, and both make filling flaky. Pasted jobs use their URL; if it's an ATS URL it's rewritten to the form page.
+
+### Read the form, plan in pure code, then fill
+In the page, a small script tags every field and describes it (label, id/name hints, required, current value, options). `submit/plan.ts` decides what goes where with no browser involved, so the matching rules are unit-tested; `prefill.ts` carries the plan out. **Rejected:** per-ATS CSS selectors. They break whenever the ATS ships new markup, and they don't help with company-specific questions, which are the bulk of a form.
+
+### Leave it blank rather than guess
+A wrong answer on a real application is worse than an empty field you notice. So: never overwrite a value that's there (Lever and Ashby fill some fields from the resume); never answer voluntary demographic questions; never tick consent checkboxes; only use a prepared answer when the question is a close match (Dice similarity on content-word stems ≥ 0.6); for choice fields only pick an option whose first word matches the answer ("Yes, anywhere in the US" → "Yes"). Everything skipped is listed with the reason.
+
+### No bot-detection workarounds
+Plain Playwright: `navigator.webdriver` stays true, no stealth plugins, no CAPTCHA handling. A fresh browser context per application, so nothing carries over between sites. If a site blocks automation, the copy panel still works.
+
+### Follow-ups: Tier A only, 7 days
+From the mentor prompt ("Tier A with no response after 7–10 days: draft one short follow-up"). Tier B is quick-apply volume, so it gets no follow-up date; the Tracker suggests marking it ghosted after 30 quiet days. Drafting the follow-up message itself belongs with the mentor agent in Phase 5.
+
+### Limits
+- Tested against hand-built copies of each ATS's form layout, not the live sites (this workspace can't reach them). Live markup can differ; the report shows what was and wasn't filled.
+- Custom dropdowns that don't use `role="option"`, and Ashby's Yes/No button pairs, aren't filled.
+- The open-form sessions live in memory; restarting the server forgets them (the application and its report stay).

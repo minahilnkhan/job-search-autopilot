@@ -1,0 +1,18 @@
+<!doctype html><html><head><meta charset="utf-8"></head><body><div id="root"></div>
+<script>
+// Ashby renders the form with JavaScript after load.
+setTimeout(() => {
+  document.getElementById("root").innerHTML = `
+  <form class="ashby-application-form">
+    <div><label for="_systemfield_name">Name<span>*</span></label><input id="_systemfield_name" name="_systemfield_name" type="text" required></div>
+    <div><label for="_systemfield_email">Email<span>*</span></label><input id="_systemfield_email" name="_systemfield_email" type="email" required></div>
+    <div><label for="_systemfield_resume">Resume<span>*</span></label><input id="_systemfield_resume" name="_systemfield_resume" type="file" required style="display:none"></div>
+    <div><label for="q-li">LinkedIn Profile</label><input id="q-li" type="text"></div>
+    <div><label for="q-phone">Phone Number</label><input id="q-phone" type="tel"></div>
+    <div><label for="q-why">What excites you about this role?</label><textarea id="q-why"></textarea></div>
+    <button type="submit">Submit Application</button>
+  </form>`;
+  document.querySelector("form").addEventListener("submit", (e) => { e.preventDefault(); window.__submitted = true; });
+}, 300);
+</script>
+</body></html>

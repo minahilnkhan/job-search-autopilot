@@ -62,12 +62,27 @@ The **resume** is one structure rendered two ways: Chromium prints the HTML temp
 
 The **Review** page shows the job, its score and gaps, each resume change as before → after, a PDF preview, the note and the answers, all editable inline. Actions: **Approve** (one application at a time), **Not applying** (with a reason, kept for tuning scoring), **Snooze**.
 
+## What Phase 4 adds
+
+**Assisted submit.** On an approved application, **Open and prefill** opens the real application form in a visible Chromium window on your machine and fills in what it can:
+
+- Name, email, phone, location, LinkedIn/GitHub and current company, from **Settings → Profile**.
+- Your resume PDF, uploaded under a proper file name.
+- Work-authorization questions, always with the fixed answers from Settings.
+- Any question that closely matches one of the application's prepared answers, and the recruiter note in "cover letter / additional information" boxes.
+
+You review the form and press **Submit** yourself. The app never clicks a button and never touches a CAPTCHA. It watches for the "thank you for applying" page and marks the application **submitted**; **I submitted it** does the same by hand. A panel lists what was filled and what's left for you, and a **copy panel** has every value with a copy button, which is also the fallback when a form can't be read.
+
+Fields are found by their visible labels (plus id/name hints), so the same rules cover Greenhouse, Lever, Ashby and most hand-built forms. Voluntary demographic questions, consent checkboxes and anything without a confident match are left for you.
+
+The **Tracker** page lists submitted applications. Move each through screen → interview → offer, or rejected / ghosted / withdrawn. Tier A applications get a follow-up date 7 days after submitting.
+
 ## Architecture
 
 ```mermaid
 flowchart LR
   subgraph Browser
-    UI["React + Vite + Tailwind<br/>Today · Add job · Jobs · Companies · Settings"]
+    UI["React + Vite + Tailwind<br/>Today · Review · Tracker · Jobs · Resumes · Companies · Settings"]
   end
   subgraph Server["Fastify server (localhost only)"]
     CRON["node-cron<br/>daily run + catch-up"]
@@ -83,6 +98,8 @@ flowchart LR
   P --> ATS
   P --> LLM
   P --> DB
+  R -- "assisted submit" --> PW["Playwright Chromium<br/>visible window: prefill only,<br/>you press Submit"]
+  PW --> FORM["ATS application form"]
 ```
 
 The rule that shapes the layout: **anything that decides eligibility, or does arithmetic on a score, is a pure function** in `server/src/domain/`, with no database, network, clock, or LLM inside it. That keeps it unit-testable and keeps the same input producing the same answer. The LLM only supplies judgments (is this requirement met, how strong is the role signal); it never filters and never totals.
@@ -95,8 +112,10 @@ server/
   src/sources/    Greenhouse / Lever / Ashby fetchers → one posting shape
   src/llm/        scoring + tailoring prompts and JSON schemas, pricing, mentor-context loader
   src/render/     resume HTML template → PDF (Chromium), DOCX (docx)
+  src/submit/     applyUrl, plan (which value goes in which field; pure), confirm,
+                  prefill (reads and fills the form in the browser), browser
   src/services/   jobs, history (30-day window), pipeline, usage (cost log),
-                  resumes, applications (prep + review), truth
+                  resumes, applications (prep + review), truth, submissions
   src/scheduler.ts  daily cron + catch-up after sleep
   src/routes/     HTTP + zod validation
   src/db/         schema.ts, migrations, idempotent seed

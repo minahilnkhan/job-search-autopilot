@@ -11,7 +11,7 @@ export function getSettings(db: DB): Settings {
   // Fill keys added after the row was first saved (JSON columns don't migrate per key).
   // Keep only known keys (an older row may still carry minFitScore).
   const { tierAPicks, tierBPicks, maxAgeDays, preferredCityBoost } = { ...DEFAULT_SETTINGS.shortlist, ...rest.shortlist };
-  return { ...rest, shortlist: { tierAPicks, tierBPicks, maxAgeDays, preferredCityBoost } };
+  return { ...rest, profile: { ...DEFAULT_SETTINGS.profile, ...rest.profile }, shortlist: { tierAPicks, tierBPicks, maxAgeDays, preferredCityBoost } };
 }
 
 /** YYYY-MM-DD for `now` in an IANA timezone (en-CA formats dates that way). */

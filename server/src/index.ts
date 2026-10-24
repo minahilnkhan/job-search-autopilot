@@ -1,3 +1,5 @@
+import { headedBrowser } from "./submit/browser";
+import type { SubmitDeps } from "./services/submissions";
 import { buildApp } from "./app";
 import { createDb, runMigrations } from "./db/client";
 import { seed } from "./db/seed";
@@ -28,7 +30,9 @@ markInterruptedRuns(db); // a run can't still be going if the app just started
 const pipeline: PipelineDeps = { fetchBoard, getScorer: anthropicScorerFactory };
 let reschedule = () => {};
 const prep: PrepDeps = { getTailor: anthropicTailorFactory, getNoteWriter: anthropicNoteFactory, renderer: makeRenderer({ chromiumPath: config.chromiumPath }), facts: loadTruthFacts };
-const app = buildApp(db, { logger: true, pipeline, prep, onSettingsChanged: () => reschedule() });
+// Assisted submit opens a visible browser window on this machine.
+const submit: SubmitDeps = { openPage: headedBrowser(config.chromiumPath) };
+const app = buildApp(db, { logger: true, pipeline, prep, submit, onSettingsChanged: () => reschedule() });
 
 // Bind to localhost only: this is a personal tool with no auth.
 await app.listen({ port: config.port, host: "127.0.0.1" });

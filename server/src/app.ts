@@ -6,6 +6,8 @@ import { companyRoutes } from "./routes/companies";
 import { settingsRoutes } from "./routes/settings";
 import { pipelineRoutes } from "./routes/pipeline";
 import { applicationRoutes } from "./routes/applications";
+import { submissionRoutes } from "./routes/submissions";
+import type { SubmitDeps } from "./services/submissions";
 import type { PrepDeps } from "./services/applications";
 import { TransitionError } from "./domain/applicationStatus";
 import { MissingInventoryError } from "./services/truth";
@@ -18,7 +20,7 @@ import type { PipelineDeps } from "./services/pipeline";
  */
 export function buildApp(
   db: DB,
-  opts: { logger?: boolean; pipeline: PipelineDeps; prep: PrepDeps; onSettingsChanged?: () => void }
+  opts: { logger?: boolean; pipeline: PipelineDeps; prep: PrepDeps; submit?: SubmitDeps; onSettingsChanged?: () => void }
 ) {
   const app = Fastify({ logger: opts.logger ?? false, bodyLimit: 1024 * 1024 });
 
@@ -43,5 +45,6 @@ export function buildApp(
   settingsRoutes(app, db, opts.onSettingsChanged);
   pipelineRoutes(app, db, opts.pipeline);
   applicationRoutes(app, db, opts.prep);
+  submissionRoutes(app, db, opts.submit);
   return app;
 }

@@ -11,6 +11,18 @@ function NumberField({ label, value, onChange, step = 1 }: { label: string; valu
   );
 }
 
+const PROFILE_FIELDS: [keyof SettingsT["profile"], string, string][] = [
+  ["firstName", "First name", "text"],
+  ["lastName", "Last name", "text"],
+  ["email", "Email", "email"],
+  ["phone", "Phone", "tel"],
+  ["location", "City and state", "text"],
+  ["currentCompany", "Current company", "text"],
+  ["linkedin", "LinkedIn URL", "text"],
+  ["github", "GitHub URL", "text"],
+  ["website", "Website or portfolio (optional)", "text"],
+];
+
 export function Settings() {
   const [s, setS] = useState<SettingsT | null>(null);
   const [status, setStatus] = useState<{ ok: boolean; text: string } | null>(null);
@@ -62,6 +74,22 @@ export function Settings() {
         <div className="sm:w-1/3">
           <label className="label">Cap review date</label>
           <input type="date" className="field" value={s.capReviewDate} onChange={(e) => setS({ ...s, capReviewDate: e.target.value })} />
+        </div>
+      </fieldset>
+
+      <fieldset className="panel space-y-4 p-5">
+        <legend className="px-1 text-lg font-semibold">Profile</legend>
+        <p className="text-[15px] text-ink-soft">
+          What the app types into application forms when you press Open and prefill. Stored only in your local database. Never put passwords here.
+        </p>
+        <div className="grid gap-4 sm:grid-cols-2">
+          {PROFILE_FIELDS.map(([key, label, type]) => (
+            <div key={key}>
+              <label className="label" htmlFor={`p-${key}`}>{label}</label>
+              <input id={`p-${key}`} type={type} className="field" value={s.profile[key]} autoComplete="off"
+                onChange={(e) => setS({ ...s, profile: { ...s.profile, [key]: e.target.value } })} />
+            </div>
+          ))}
         </div>
       </fieldset>
 

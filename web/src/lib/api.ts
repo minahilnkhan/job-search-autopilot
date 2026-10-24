@@ -15,6 +15,8 @@ import type {
   PipelineRun,
   Settings,
   Shortlist,
+  SubmitSession,
+  TrackedApplication,
 } from "../../../shared/types";
 
 export class ApiError extends Error {
@@ -89,8 +91,18 @@ export const api = {
   unapprove: (id: number) => request<ApplicationDetail>("POST", `/api/applications/${id}/unapprove`, {}),
   reject: (id: number, reason: string) => request<ApplicationDetail>("POST", `/api/applications/${id}/reject`, { reason }),
   snooze: (id: number, until: string | null) => request<ApplicationDetail>("POST", `/api/applications/${id}/snooze`, { until }),
+  // Phase 4
+  openToSubmit: (id: number) => request<SubmitSession>("POST", `/api/applications/${id}/submit/open`, {}),
+  submitSession: (id: number) => request<SubmitSession>("GET", `/api/applications/${id}/submit`),
+  markSubmitted: (id: number) => request<ApplicationDetail>("POST", `/api/applications/${id}/submitted`, {}),
+  unmarkSubmitted: (id: number) => request<ApplicationDetail>("POST", `/api/applications/${id}/unsubmit`, {}),
+  tracker: () => request<TrackedApplication[]>("GET", "/api/tracker"),
+  setStatus: (id: number, status: TrackStatus) => request<ApplicationDetail>("POST", `/api/applications/${id}/status`, { status }),
+  followUp: (id: number, action: "done" | "later") => request<ApplicationDetail>("POST", `/api/applications/${id}/follow-up`, { action }),
   monthSpend: () => request<{ month: string; calls: number; costUsd: number; unpricedCalls: number }>("GET", "/api/usage/month"),
 };
+
+export type TrackStatus = "screen" | "interview" | "offer" | "rejected" | "ghosted" | "withdrawn";
 
 export const usd = (n: number) => (n < 0.01 && n > 0 ? "<$0.01" : `$${n.toFixed(2)}`);
 

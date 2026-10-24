@@ -8,12 +8,14 @@ import { Companies } from "./pages/Companies";
 import { Settings } from "./pages/Settings";
 import { Review } from "./pages/Review";
 import { Resumes } from "./pages/Resumes";
+import { Tracker } from "./pages/Tracker";
 
 // Hash routing: a handful of pages don't need a router dependency.
 const ROUTES = [
   { path: "#/today", label: "Today" },
   { path: "#/add", label: "Add a job" },
   { path: "#/review", label: "Review" },
+  { path: "#/tracker", label: "Tracker" },
   { path: "#/jobs", label: "Jobs" },
   { path: "#/resumes", label: "Resumes" },
   { path: "#/companies", label: "Companies" },
@@ -92,6 +94,7 @@ export default function App() {
         {route === "#/review" && <Review key={location.hash} onCountsChanged={loadReviewCount} />}
         {route === "#/jobs" && <Jobs jobs={jobs} setJobs={setJobs} />}
         {route === "#/resumes" && <Resumes />}
+        {route === "#/tracker" && <Tracker />}
         {route === "#/companies" && <Companies onJobsChanged={loadJobs} />}
         {route === "#/settings" && <Settings />}
       </main>

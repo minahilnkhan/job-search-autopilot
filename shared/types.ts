@@ -107,7 +107,21 @@ export type CreateJobRequest = {
 
 export type CreateJobResponse = { duplicate: boolean; job: Job };
 
+/** Your details for application forms (Phase 4 prefill). Never passwords. */
+export type Profile = {
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone: string;
+  location: string; // e.g. "Chicago, IL"
+  linkedin: string;
+  github: string;
+  website: string;
+  currentCompany: string;
+};
+
 export type Settings = {
+  profile: Profile;
   targets: {
     appsPerDay: number;
     daysPerWeek: number;
@@ -275,6 +289,9 @@ export type ApplicationDetail = ApplicationSummary & {
   changes: ResumeChange[];
   recruiterNote: string | null;
   noteBasis: NoteBasis | null;
+  prefillReport: PrefillReport | null;
+  submittedAt: number | null;
+  followUpDue: string | null;
   answers: Answer[];
   truth: TruthReport;
   pdfPages: number | null;
@@ -292,4 +309,33 @@ export type BaseResume = {
   truth: TruthReport | null;
   pdfPages: number | null;
   hasPdf: boolean;
+};
+
+// ---- Phase 4: assisted submit -------------------------------------------------
+
+export type Ats = "greenhouse" | "lever" | "ashby" | "other";
+
+/** What the prefill did on the real form, shown next to the copy panel. */
+export type PrefillReport = {
+  ats: Ats;
+  url: string;
+  filled: { label: string; value: string }[];
+  leftForYou: { label: string; reason: string; required: boolean }[];
+  resumeUploaded: boolean;
+  error: string | null; // set when the page couldn't be opened or read; use the copy panel
+  at: number;
+};
+
+export type SubmitSession = {
+  applicationId: number;
+  state: "opening" | "open" | "submitted" | "closed";
+  report: PrefillReport | null;
+};
+
+/** One row on the Tracker page. */
+export type TrackedApplication = ApplicationSummary & {
+  submittedAt: number | null;
+  followUpDue: string | null; // YYYY-MM-DD
+  lastActivityAt: number | null;
+  jobUrl: string | null;
 };

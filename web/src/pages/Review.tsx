@@ -3,6 +3,7 @@ import type { ApplicationDetail, ApplicationSummary, TruthIssue } from "../../..
 import { api } from "../lib/api";
 import { addDays, editableLines } from "../lib/resumeLines";
 import { TruthPanel } from "../components/TruthPanel";
+import { SubmitPanel } from "../components/SubmitPanel";
 import { ScoreBadge, ScoreBreakdownView } from "../components/Score";
 import { PreparingTray, type Preparing } from "../components/PreparingTray";
 
@@ -53,6 +54,10 @@ function Detail({ id, onChanged, onOpen }: { id: number; onChanged: () => void; 
   }
 
   const lines = useMemo(() => (app ? editableLines(app.resume) : []), [app]);
+  const submitChanged = useCallback((a: ApplicationDetail) => {
+    load(a);
+    onChanged();
+  }, [load, onChanged]);
   if (!app) return <p className="text-ink-soft">{error ?? "Loading…"}</p>;
 
   const editable = app.status === "draft" || app.status === "ready_for_review";
@@ -323,11 +328,11 @@ function Detail({ id, onChanged, onOpen }: { id: number; onChanged: () => void; 
             Approve this application
           </button>
         )}
+        {(app.status === "approved" || app.status === "submitted") && (
+          <SubmitPanel app={app} onChanged={submitChanged} />
+        )}
         {app.status === "approved" && (
-          <>
-            <p className="text-[15px] text-pass">Approved. In Phase 4 the app opens the form, fills it in, and you submit it yourself.</p>
-            <button className="btn-quiet" disabled={!!busy} onClick={() => act("unapprove", () => api.unapprove(app.id))}>Move back to review</button>
-          </>
+          <button className="btn-quiet" disabled={!!busy} onClick={() => act("unapprove", () => api.unapprove(app.id))}>Move back to review</button>
         )}
         {app.status === "ready_for_review" && (
           <select className="field w-auto" value="" disabled={!!busy}

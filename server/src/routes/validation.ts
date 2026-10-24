@@ -72,7 +72,19 @@ export const companyBody = z.object({
   notes: z.string().nullable().optional(),
 });
 
+const optText = z.string().trim().max(300);
 export const settingsBody = z.object({
+  profile: z.object({
+    firstName: optText,
+    lastName: optText,
+    email: z.union([z.email(), z.literal("")]),
+    phone: optText,
+    location: optText,
+    linkedin: optText,
+    github: optText,
+    website: optText,
+    currentCompany: optText,
+  }),
   targets: z.object({
     appsPerDay: z.number().int().min(1).max(50),
     daysPerWeek: z.number().int().min(1).max(7),
