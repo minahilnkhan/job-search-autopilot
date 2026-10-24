@@ -86,7 +86,9 @@ describe("request settings (thinking counts toward max_tokens)", () => {
       const req = body.output_config.format.schema.required as string[];
       const text = req.includes("lineEdits")
         ? JSON.stringify({ lineEdits: [], bulletOrder: [], answers: [], keywordsCovered: [], keywordsMissing: [], honestGaps: [] })
-        : req.includes("recruiterNote")
+        : req.includes("items")
+          ? JSON.stringify({ items: [{ id: "ap1", action: "ask", answer: "", ask: "What salary should I put?" }] })
+          : req.includes("recruiterNote")
           ? JSON.stringify({ companyValue: "Ownership", valueSource: "you own problems end to end", story: "Morphemic Dictionary", standout: "Teachers checked it", recruiterNote: " A note. " })
           : JSON.stringify(GOOD_JUDGMENT);
       return new Response(
@@ -124,5 +126,14 @@ describe("request settings (thinking counts toward max_tokens)", () => {
     expect(r.basis).toEqual({ companyValue: "Ownership", valueSource: "you own problems end to end", story: "Morphemic Dictionary", standout: "Teachers checked it" });
     expect(bodies[0]).toMatchObject({ output_config: { effort: "medium" }, max_tokens: 8000 });
     expect(JSON.stringify(bodies[0]!.messages)).toContain("<company_notes>\\nValues: ownership");
+  });
+
+  it("the answer writer sends each question with its options and returns answer/ask items", async () => {
+    const { makeAnthropicAnswerWriter } = await import("../src/llm/answers");
+    const { bodies, fetchStub } = capture();
+    const write = makeAnthropicAnswerWriter({ apiKey: "test", model: "claude-sonnet-5-5", context, fetch: fetchStub });
+    const r = await write({ companyName: "Acme", title: "FDE", description: "JD", resumeText: "# Me", recruiterNote: null, questions: [{ id: "ap1", label: "Salary?", kind: "select", options: ["<100k", "100k+"], required: true }] });
+    expect(r.items).toEqual([{ id: "ap1", action: "ask", answer: "", ask: "What salary should I put?" }]);
+    expect(JSON.stringify(bodies[0]!.messages)).toContain('kind=\\"select\\" required>Salary?\\nOptions: <100k | 100k+');
   });
 });

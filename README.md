@@ -71,7 +71,9 @@ The **Review** page shows the job, its score and gaps, each resume change as bef
 - Work-authorization questions, always with the fixed answers from Settings.
 - Any question that closely matches one of the application's prepared answers, and the recruiter note in "cover letter / additional information" boxes.
 
-You review the form and press **Submit** yourself. The app never clicks a button and never touches a CAPTCHA. It watches for the "thank you for applying" page and marks the application **submitted**; **I submitted it** does the same by hand. A panel lists what was filled and what's left for you, and a **copy panel** has every value with a copy button, which is also the fallback when a form can't be read.
+Questions nothing prepared covers ("Why Anthropic?", "Tell us about a project") are drafted on the spot by Claude Sonnet from your inventory and the posting, Truth-Checked, and typed in. When an answer depends on something only you know (salary, start date, a referral) or a draft fails the Truth Check, the app asks you in a **Questions for you** chat on that application; your reply goes straight into the open form, and you can keep it for every application.
+
+You review the form and press **Submit** yourself. The app never submits and never touches a CAPTCHA (the only button it may press is a resume "Attach" button, to open the file picker). It watches for the "thank you for applying" page and marks the application **submitted**; **I submitted it** does the same by hand. A panel lists what was filled and what's left for you, and a **copy panel** has every value with a copy button, which is also the fallback when a form can't be read.
 
 Fields are found by their visible labels (plus id/name hints), so the same rules cover Greenhouse, Lever, Ashby and most hand-built forms. Voluntary demographic questions, consent checkboxes and anything without a confident match are left for you.
 

@@ -28,8 +28,9 @@ export type FillAction =
   | { op: "combobox"; id: string; label: string; value: string } // type value, pick the first matching option
   | { op: "upload"; id: string; label: string; value: string }; // value = file name shown in the report
 
-export type LeftForYou = { label: string; reason: string; required: boolean };
-export type FillPlan = { actions: FillAction[]; leftForYou: LeftForYou[] };
+export type LeftForYou = { label: string; reason: string; required: boolean; controlId?: string };
+/** unanswered: questions nothing prepared covers; the answer writer gets a go at them. */
+export type FillPlan = { actions: FillAction[]; leftForYou: LeftForYou[]; unanswered: FormControl[] };
 
 export type PrefillValues = {
   profile: Profile;
@@ -124,6 +125,7 @@ function pickOption(options: { id?: string; text: string }[], answer: string) {
 export function planFill(controls: FormControl[], v: PrefillValues): FillPlan {
   const actions: FillAction[] = [];
   const leftForYou: LeftForYou[] = [];
+  const unanswered: FormControl[] = [];
   const fixedAuth = v.answers.find((a) => a.source === "fixed" && /authori/i.test(a.question) && !/sponsor/i.test(a.question));
   const fixedSponsor = v.answers.find((a) => a.source === "fixed" && /sponsor/i.test(a.question));
   const fileInputs = controls.filter((c) => c.kind === "file");
@@ -206,12 +208,16 @@ export function planFill(controls: FormControl[], v: PrefillValues): FillPlan {
       if (c.required) left("Checkbox: read it and tick it yourself");
       continue;
     }
-    if (c.required || label) left(c.required ? "No prepared answer" : "Optional, no prepared answer");
+    if (c.required || label) {
+      leftForYou.push({ label: short(c.label), reason: c.required ? "No prepared answer" : "Optional, no prepared answer", required: c.required, controlId: c.id });
+      if (label) unanswered.push(c);
+    }
   }
-  return { actions, leftForYou };
+  return { actions, leftForYou, unanswered };
 }
 
-function planAnswer(c: FormControl, answer: string): FillAction | null {
+/** The fill action for putting `answer` into control `c`, or null if it can't (e.g. no matching option). */
+export function planAnswer(c: FormControl, answer: string): FillAction | null {
   const label = short(c.label);
   switch (c.kind) {
     case "text":

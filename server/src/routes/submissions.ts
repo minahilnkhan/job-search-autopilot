@@ -3,6 +3,7 @@ import { z } from "zod";
 import type { DB } from "../db/client";
 import { ConflictError } from "../services/jobs";
 import {
+  answerAsk,
   getSubmitSession,
   listTracked,
   markSubmitted,
@@ -23,6 +24,11 @@ export function submissionRoutes(app: FastifyInstance, db: DB, deps: SubmitDeps 
     return openAndPrefill(db, idParam.parse(req.params).id, deps);
   });
   app.get("/api/applications/:id/submit", async (req) => getSubmitSession(db, idParam.parse(req.params).id));
+  // Your reply to a question the app asked in the chat.
+  app.post("/api/applications/:id/submit/answer", async (req) => {
+    const body = z.object({ askId: z.string().min(1), answer: z.string().min(1).max(5000), remember: z.boolean().default(false) }).parse(req.body);
+    return answerAsk(db, idParam.parse(req.params).id, body.askId, body.answer, body.remember, deps?.facts);
+  });
   app.post("/api/applications/:id/submitted", async (req) => markSubmitted(db, idParam.parse(req.params).id));
   app.post("/api/applications/:id/unsubmit", async (req) => unmarkSubmitted(db, idParam.parse(req.params).id));
 

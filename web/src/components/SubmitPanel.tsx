@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import type { ApplicationDetail, Profile, SubmitSession } from "../../../shared/types";
+import type { ApplicationDetail, Profile, SubmitAsk, SubmitSession } from "../../../shared/types";
 import { api } from "../lib/api";
 
 function CopyRow({ label, value }: { label: string; value: string }) {
@@ -59,6 +59,58 @@ function CopyPanel({ app, profile, open }: { app: ApplicationDetail; profile: Pr
         ))}
       </div>
     </details>
+  );
+}
+
+/** One question from the app, chat style: its question, your reply, and where the reply went. */
+function AskBubble({ appId, ask, onAnswered }: { appId: number; ask: SubmitAsk; onAnswered: (s: SubmitSession) => void }) {
+  const [reply, setReply] = useState(ask.draft ?? "");
+  const [remember, setRemember] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  return (
+    <li className="space-y-2">
+      <div className="max-w-[85%] rounded-lg rounded-tl-sm bg-paper px-3 py-2">
+        <p className="text-sm text-ink-soft">
+          {ask.label}
+          {ask.required && <span className="text-fail"> · required</span>}
+        </p>
+        <p className="text-[15px]">{ask.question}</p>
+      </div>
+      {ask.answer ? (
+        <div className="ml-auto max-w-[85%] space-y-1 text-right">
+          <p className="inline-block rounded-lg rounded-tr-sm bg-accent px-3 py-2 text-left text-[15px] text-white">{ask.answer}</p>
+          <p className="text-sm text-ink-soft">{ask.filled ? "Typed into the form." : "Saved. The form window is closed, so paste it from the copy panel."}</p>
+        </div>
+      ) : (
+        <form
+          className="ml-auto max-w-[85%] space-y-2"
+          onSubmit={async (e) => {
+            e.preventDefault();
+            setBusy(true);
+            setError(null);
+            try {
+              onAnswered(await api.answerAsk(appId, ask.id, reply, remember));
+            } catch (err) {
+              setError((err as Error).message);
+            } finally {
+              setBusy(false);
+            }
+          }}
+        >
+          <textarea aria-label={`Your answer: ${ask.label}`} className="field" rows={ask.draft ? 4 : 2} value={reply} onChange={(e) => setReply(e.target.value)}
+            placeholder="Type your answer" />
+          <div className="flex flex-wrap items-center justify-end gap-3">
+            <label className="flex items-center gap-2 text-sm text-ink-soft">
+              <input type="checkbox" className="h-4 w-4 accent-accent" checked={remember} onChange={(e) => setRemember(e.target.checked)} />
+              Use this answer on every application
+            </label>
+            <button className="btn-primary py-1.5" disabled={busy || !reply.trim()}>{busy ? "Filling…" : "Send"}</button>
+          </div>
+          {error && <p className="text-sm text-fail">{error}</p>}
+        </form>
+      )}
+    </li>
   );
 }
 
@@ -146,10 +198,30 @@ export function SubmitPanel({ app, onChanged }: { app: ApplicationDetail; onChan
         </button>
         {report?.url && <a className="btn-quiet" href={report.url} target="_blank" rel="noreferrer">Open the form in your browser</a>}
       </div>
+      {session?.state === "opening" && (
+        <p className="text-[15px]">Opening the form, filling it in, and drafting answers to its open questions. This takes about half a minute.</p>
+      )}
       {session?.state === "open" && (
         <p className="text-[15px]">The form is open in the Chromium window. When you submit, the app notices the thank-you page and marks it submitted.</p>
       )}
       {error && <p className="text-[15px] text-fail">{error}</p>}
+
+      {report?.notices?.map((n, i) => (
+        <p key={i} className="rounded-md bg-warn-bg px-3 py-2 text-[15px] text-warn">{n}</p>
+      ))}
+
+      {(report?.asks?.length ?? 0) > 0 && (
+        <div className="space-y-3 rounded-md border border-line p-3">
+          <p className="font-medium">
+            Questions for you ({report!.asks.filter((a) => !a.answer).length} open)
+          </p>
+          <ul className="space-y-4">
+            {report!.asks.map((a) => (
+              <AskBubble key={a.id} appId={app.id} ask={a} onAnswered={setSession} />
+            ))}
+          </ul>
+        </div>
+      )}
 
       {report && (
         <div className="space-y-3 rounded-md border border-line p-3">

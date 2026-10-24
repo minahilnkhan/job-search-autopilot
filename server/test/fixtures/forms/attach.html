@@ -1,0 +1,20 @@
+<!doctype html><html><head><meta charset="utf-8"></head><body>
+<form>
+  <div><label for="email">Email</label><input id="email" type="email"></div>
+  <div class="upload"><span>Resume/CV *</span> <button type="button" id="attach">Attach</button> <span id="filename"></span></div>
+  <div><label for="salary">What are your salary expectations?*</label><input id="salary" type="text" required></div>
+  <div><label for="why">Why do you want to join Acme?*</label><textarea id="why" required></textarea></div>
+  <div><label for="claim">Describe your biggest performance win*</label><textarea id="claim" required></textarea></div>
+  <button type="submit">Submit</button>
+</form>
+<script>
+// No file input until you press Attach, like some upload widgets.
+document.getElementById("attach").addEventListener("click", () => {
+  const input = document.createElement("input");
+  input.type = "file";
+  input.addEventListener("change", () => { document.getElementById("filename").textContent = input.files[0].name; window.__resume = input.files[0].name; });
+  input.click();
+});
+document.querySelector("form").addEventListener("submit", (e) => { e.preventDefault(); window.__submitted = true; });
+</script>
+</body></html>

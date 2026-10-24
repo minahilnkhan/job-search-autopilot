@@ -12,7 +12,7 @@ import { eq } from "drizzle-orm";
 import { buildApp } from "../src/app";
 import { jobs, settings } from "../src/db/schema";
 import { resetSubmitSessions } from "../src/services/submissions";
-import { FDE_JD, FIXTURE_RESUME, OFFLINE_PIPELINE, makeTestDb, prepDeps } from "./helpers";
+import { FDE_JD, FIXTURE_FACTS, FIXTURE_RESUME, OFFLINE_PIPELINE, makeTestDb, prepDeps } from "./helpers";
 
 const PROFILE = {
   firstName: "Minahil",
@@ -106,7 +106,7 @@ describe("planning the fill", () => {
     expect(plan.actions).toEqual([]);
     expect(plan.leftForYou).toEqual([
       { label: "Gender", reason: "Voluntary self-identification: your call", required: false },
-      { label: "What is your desired compensation?", reason: "No prepared answer", required: true },
+      { label: "What is your desired compensation?", reason: "No prepared answer", required: true, controlId: "2" },
       { label: "Website", reason: "Not in Settings → Profile yet", required: false },
     ]);
   });
@@ -291,4 +291,95 @@ describe.skipIf(!chromiumPath)("assisted submit through the API", () => {
     expect((await req("POST", `/api/applications/${a.id}/unsubmit`)).body).toMatchObject({ status: "approved", submittedAt: null });
     expect((await req("GET", "/api/tracker")).body).toEqual([]);
   });
+});
+
+describe.skipIf(!chromiumPath)("drafting answers and asking you", () => {
+  let browser: Browser;
+  beforeAll(async () => {
+    const { chromium } = await import("playwright");
+    browser = await chromium.launch({ executablePath: chromiumPath });
+  });
+  afterAll(async () => {
+    resetSubmitSessions();
+    await browser?.close();
+  });
+
+  it("attaches the resume through an Attach button, drafts 'Why', asks about salary, and turns a flagged draft into a question", async () => {
+    const db = makeTestDb();
+    db.update(settings).set({ standardAnswers: [{ question: "When can you start?", answer: "Two weeks." }], profile: PROFILE }).run();
+    let page: Page | null = null;
+    const seen: string[] = [];
+    const app = buildApp(db, {
+      pipeline: OFFLINE_PIPELINE,
+      prep: prepDeps(),
+      submit: {
+        watchEveryMs: 100,
+        facts: () => FIXTURE_FACTS,
+        getAnswerWriter: () => ({
+          writer: async (input) => {
+            seen.push(...input.questions.map((q) => q.label));
+            return {
+              model: "claude-sonnet-5-5",
+              usage: { inputTokens: 1, outputTokens: 1, cacheReadTokens: 0, cacheWriteTokens: 0 },
+              items: input.questions.map((q) =>
+                /why/i.test(q.label)
+                  ? { id: q.id, action: "answer" as const, answer: "I built a production Claude pipeline and want to do that for Acme's customers.", ask: "" }
+                  : /salary/i.test(q.label)
+                    ? { id: q.id, action: "ask" as const, answer: "", ask: "What salary range should I put?" }
+                    : { id: q.id, action: "answer" as const, answer: "I cut search latency 60% at Acme Learning.", ask: "" }
+              ),
+            };
+          },
+        }),
+        openPage: async () => {
+          page = await browser.newPage();
+          await page.goto(`file://${path.join(FORMS, "attach.html")}`);
+          return page;
+        },
+      },
+    });
+    const req = async (method: "GET" | "POST" | "PUT", url: string, payload?: unknown) => {
+      const res = await app.inject({ method, url, payload: payload as object });
+      return { status: res.statusCode, body: res.json() };
+    };
+    await req("PUT", "/api/resumes/bases/fde", { text: FIXTURE_RESUME });
+    await req("PUT", "/api/resumes/bases/swe", { text: FIXTURE_RESUME });
+    const job = (await req("POST", "/api/jobs", { companyName: "Acme AI", title: "Software Engineer", url: "https://acme.example/jobs/1", location: "Chicago, IL", description: FDE_JD })).body.job;
+    db.update(jobs).set({ tier: "B", fitScore: 6 }).where(eq(jobs.id, job.id)).run();
+    const a = (await req("POST", "/api/applications", { jobId: job.id })).body;
+    await req("POST", `/api/applications/${a.id}/approve`);
+    await req("POST", `/api/applications/${a.id}/submit/open`);
+    let s = (await req("GET", `/api/applications/${a.id}/submit`)).body;
+    for (let i = 0; i < 150 && (!s.report || s.state === "opening"); i++) {
+      await new Promise((r) => setTimeout(r, 100));
+      s = (await req("GET", `/api/applications/${a.id}/submit`)).body;
+    }
+    expect(s.report.resumeUploaded).toBe(true);
+    expect(await page!.evaluate(() => (window as { __resume?: string }).__resume)).toBe("Test_Person_Resume.pdf");
+    expect(seen).toEqual(["What are your salary expectations?", "Why do you want to join Acme?", "Describe your biggest performance win"]);
+    expect(await page!.locator("#why").inputValue()).toBe("I built a production Claude pipeline and want to do that for Acme's customers.");
+    expect(await page!.locator("#claim").inputValue()).toBe(""); // the 60% draft failed the Truth Check
+    expect(s.report.asks).toEqual([
+      expect.objectContaining({ id: "ask-1", label: "What are your salary expectations?", question: "What salary range should I put?", draft: null, required: true }),
+      expect.objectContaining({ id: "ask-2", label: "Describe your biggest performance win", draft: "I cut search latency 60% at Acme Learning." }),
+    ]);
+    expect(s.report.asks[1].question).toContain("Truth Check");
+    expect(s.report.leftForYou.map((l: { label: string }) => l.label)).not.toContain("Why do you want to join Acme?");
+
+    // You answer in the chat; it goes straight into the open form, and can be kept for next time.
+    // A flagged draft sent back unchanged is still refused.
+    const still = await req("POST", `/api/applications/${a.id}/submit/answer`, { askId: "ask-2", answer: "I cut search latency 60% at Acme Learning.", remember: false });
+    expect(still.status).toBe(409);
+    expect(still.body.error).toContain("Still flagged");
+    s = (await req("POST", `/api/applications/${a.id}/submit/answer`, { askId: "ask-1", answer: "Open to the posted range.", remember: true })).body;
+    expect(s.report.asks[0]).toMatchObject({ answer: "Open to the posted range.", filled: true });
+    expect(await page!.locator("#salary").inputValue()).toBe("Open to the posted range.");
+    const detail = (await req("GET", `/api/applications/${a.id}`)).body;
+    expect(detail.answers).toEqual(expect.arrayContaining([
+      expect.objectContaining({ question: "Why do you want to join Acme?", source: "generated" }),
+      expect.objectContaining({ question: "What are your salary expectations?", answer: "Open to the posted range.", source: "standard" }),
+    ]));
+    expect((await req("GET", "/api/settings")).body.standardAnswers).toEqual(expect.arrayContaining([{ question: "What are your salary expectations?", answer: "Open to the posted range." }]));
+    expect(await page!.evaluate(() => (window as { __submitted?: boolean }).__submitted ?? false)).toBe(false);
+  }, 30000);
 });

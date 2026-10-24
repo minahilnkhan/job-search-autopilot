@@ -323,7 +323,20 @@ export type PrefillReport = {
   leftForYou: { label: string; reason: string; required: boolean }[];
   resumeUploaded: boolean;
   error: string | null; // set when the page couldn't be opened or read; use the copy panel
+  notices: string[]; // blockers worth your attention: a CAPTCHA, no form found
+  asks: SubmitAsk[]; // questions the app put to you in the chat
   at: number;
+};
+
+/** A question the app needs you to answer to finish the form. */
+export type SubmitAsk = {
+  id: string;
+  label: string; // the form's question
+  question: string; // what the app is asking you
+  draft: string | null; // a drafted answer the Truth Check flagged, for you to edit
+  required: boolean;
+  answer: string | null; // your reply, once given
+  filled: boolean; // typed into the open form
 };
 
 export type SubmitSession = {

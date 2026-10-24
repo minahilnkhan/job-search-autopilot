@@ -93,6 +93,8 @@ export const api = {
   snooze: (id: number, until: string | null) => request<ApplicationDetail>("POST", `/api/applications/${id}/snooze`, { until }),
   // Phase 4
   openToSubmit: (id: number) => request<SubmitSession>("POST", `/api/applications/${id}/submit/open`, {}),
+  answerAsk: (id: number, askId: string, answer: string, remember: boolean) =>
+    request<SubmitSession>("POST", `/api/applications/${id}/submit/answer`, { askId, answer, remember }),
   submitSession: (id: number) => request<SubmitSession>("GET", `/api/applications/${id}/submit`),
   markSubmitted: (id: number) => request<ApplicationDetail>("POST", `/api/applications/${id}/submitted`, {}),
   unmarkSubmitted: (id: number) => request<ApplicationDetail>("POST", `/api/applications/${id}/unsubmit`, {}),

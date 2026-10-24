@@ -4,6 +4,7 @@ import { loadMentorContext, MissingContextError } from "./context";
 import { makeAnthropicScorer } from "./scoreJob";
 import { makeAnthropicTailor, type Tailor } from "./tailor";
 import { makeAnthropicNoteWriter, type NoteWriter } from "./note";
+import { makeAnthropicAnswerWriter, type AnswerWriter } from "./answers";
 import type { Settings } from "../../../shared/types";
 
 /** Real scorer, or a plain-words reason it can't run yet. */
@@ -38,6 +39,18 @@ export function anthropicNoteFactory(settings: Settings): { writer: NoteWriter }
   try {
     const context = loadMentorContext();
     return { writer: makeAnthropicNoteWriter({ apiKey: config.anthropicApiKey, model: settings.models.tailoring, context }) };
+  } catch (err) {
+    if (err instanceof MissingContextError) return { unavailable: err.message };
+    throw err;
+  }
+}
+
+/** Answers unprepared form questions during assisted submit (tailoring model). */
+export function anthropicAnswerFactory(settings: Settings): { writer: AnswerWriter } | { unavailable: string } {
+  if (!config.anthropicApiKey) return { unavailable: "no ANTHROPIC_API_KEY in .env" };
+  try {
+    const context = loadMentorContext();
+    return { writer: makeAnthropicAnswerWriter({ apiKey: config.anthropicApiKey, model: settings.models.tailoring, context }) };
   } catch (err) {
     if (err instanceof MissingContextError) return { unavailable: err.message };
     throw err;
