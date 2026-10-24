@@ -76,3 +76,39 @@ describe("mentor prompt slots", () => {
     expect(fillMentorPrompt("Be helpful.", { candidate_inventory: "facts" })).toBe("Be helpful.\n\n<candidate_inventory>\nfacts\n</candidate_inventory>");
   });
 });
+
+describe("request settings (thinking counts toward max_tokens)", () => {
+  const capture = () => {
+    const bodies: Record<string, unknown>[] = [];
+    const fetchStub = (async (_url: string, init: RequestInit) => {
+      const body = JSON.parse(String(init.body));
+      bodies.push(body);
+      const text = body.output_config.format.schema.required.includes("lineEdits")
+        ? JSON.stringify({ lineEdits: [], bulletOrder: [], recruiterNote: "Hi.", answers: [], keywordsCovered: [], keywordsMissing: [], honestGaps: [] })
+        : JSON.stringify(GOOD_JUDGMENT);
+      return new Response(
+        JSON.stringify({ id: "m", type: "message", role: "assistant", model: body.model, content: [{ type: "text", text }], stop_reason: "end_turn", stop_sequence: null, usage: { input_tokens: 10, output_tokens: 10 } }),
+        { status: 200, headers: { "content-type": "application/json" } }
+      );
+    }) as unknown as typeof fetch;
+    return { bodies, fetchStub };
+  };
+  const context = { mentorPrompt: "Rubric.", inventory: "Facts." };
+
+  it("scoring turns thinking off and uses low effort, so long postings can't run out of room", async () => {
+    const { makeAnthropicScorer } = await import("../src/llm/scoreJob");
+    const { bodies, fetchStub } = capture();
+    const score = makeAnthropicScorer({ apiKey: "test", model: "claude-haiku-5-5", context, fetch: fetchStub });
+    await score({ companyName: "Acme", title: "FDE", location: null, postedAt: null, employmentType: null, description: "JD" });
+    expect(bodies[0]).toMatchObject({ thinking: { type: "disabled" }, output_config: { effort: "low" }, max_tokens: 3000 });
+  });
+
+  it("tailoring keeps thinking but leaves plenty of room", async () => {
+    const { makeAnthropicTailor } = await import("../src/llm/tailor");
+    const { bodies, fetchStub } = capture();
+    const tailor = makeAnthropicTailor({ apiKey: "test", model: "claude-sonnet-5-5", context, fetch: fetchStub });
+    await tailor({ companyName: "Acme", title: "FDE", location: null, description: "JD", baseResume: "[0.0.0] x", questions: [] });
+    expect(bodies[0]).toMatchObject({ max_tokens: 16000, output_config: { effort: "medium" } });
+    expect(bodies[0]).not.toHaveProperty("thinking");
+  });
+});

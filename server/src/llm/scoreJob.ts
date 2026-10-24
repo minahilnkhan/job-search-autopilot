@@ -25,7 +25,12 @@ export class ScoreError extends Error {
 /** Refusals and max_tokens cut-offs don't follow the schema, so check before trusting it. */
 export function parseJudgment(msg: Pick<Anthropic.Message, "content" | "stop_reason">, usage?: TokenUsage): ModelJudgment {
   if (msg.stop_reason !== "end_turn") {
-    throw new ScoreError(`Scoring stopped early (stop reason: ${msg.stop_reason}).`, usage);
+    throw new ScoreError(
+      msg.stop_reason === "max_tokens"
+        ? "Scoring ran out of output room before finishing (max_tokens). The job stays unscored and is retried next run."
+        : `Scoring stopped early (stop reason: ${msg.stop_reason}).`,
+      usage
+    );
   }
   const text = msg.content.find((b): b is Anthropic.TextBlock => b.type === "text")?.text ?? "";
   let raw: unknown;
@@ -142,8 +147,8 @@ export function buildUserMessage(input: ScoreInput): string {
  * the system prompt with a cache breakpoint after them. The first call in a run
  * writes the cache; the rest read it at a tenth of the input price (or less).
  */
-export function makeAnthropicScorer(opts: { apiKey: string; model: string; context: MentorContext }): Scorer {
-  const client = new Anthropic({ apiKey: opts.apiKey, maxRetries: 3 });
+export function makeAnthropicScorer(opts: { apiKey: string; model: string; context: MentorContext; fetch?: typeof fetch }): Scorer {
+  const client = new Anthropic({ apiKey: opts.apiKey, maxRetries: 3, fetch: opts.fetch });
   const system: Anthropic.TextBlockParam[] = [
     { type: "text", text: scoringSystemPrompt(opts.context) },
     { type: "text", text: INSTRUCTIONS, cache_control: { type: "ephemeral" } },
@@ -152,10 +157,14 @@ export function makeAnthropicScorer(opts: { apiKey: string; model: string; conte
   return async (input) => {
     const msg = await client.messages.create({
       model: opts.model,
-      max_tokens: 2000,
+      // Haiku 5.5 thinks by default, and thinking counts toward max_tokens:
+      // long postings ran out of room mid-answer. Scoring is a structured
+      // judgment against a written rubric, so thinking is off and effort low.
+      max_tokens: 3000,
+      thinking: { type: "disabled" },
       system,
       messages: [{ role: "user", content: buildUserMessage(input) }],
-      output_config: { format: { type: "json_schema", schema: JUDGMENT_JSON_SCHEMA } },
+      output_config: { effort: "low", format: { type: "json_schema", schema: JUDGMENT_JSON_SCHEMA } },
     });
     const usage: TokenUsage = {
       inputTokens: msg.usage.input_tokens,

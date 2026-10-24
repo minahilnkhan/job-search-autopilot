@@ -133,3 +133,6 @@ Rejecting in review sets status `withdrawn` with your reason and dismisses the j
 
 ### Status transitions are a whitelist
 `draft → ready_for_review → approved → submitted → …`. Every change goes through `assertTransition`, so nothing can jump from draft to submitted.
+
+### Thinking budgets (fix after the first live runs)
+Claude 5.5 models think before answering, and thinking counts toward `max_tokens`. Haiku 5.5 scoring at `max_tokens: 2000` ran out of room on 18 long postings (`stop_reason: max_tokens`). Scoring is a structured judgment against a written rubric, so it now runs with `thinking: disabled`, `effort: low` and 3,000 tokens, which is cheaper and can't truncate. Tailoring (Sonnet 5.5) benefits from thinking, so it keeps it, at `effort: medium` with 16,000 tokens of room; you only pay for tokens used. Jobs that failed stay unscored and are retried on the next run.
