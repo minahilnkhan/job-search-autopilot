@@ -123,20 +123,24 @@ describe("preparing", () => {
     expect(body).toMatchObject({ status: "ready_for_review", tier: "A", baseType: "fde" });
     expect(body.changes).toEqual([expect.objectContaining({ before: "Owned the Word Splitter feature end to end", after: "Owned the Word Splitter LLM feature end to end" })]);
     expect(body.recruiterNote).toContain("Claude pipeline");
+    expect(body.noteBasis).toMatchObject({ companyValue: "Customer focus" });
     const sources = body.answers.map((a: { source: string }) => a.source);
     expect(sources.filter((s: string) => s === "generated")).toHaveLength(2);
     expect(body.answers.filter((a: { source: string }) => a.source === "fixed")).toEqual([
       expect.objectContaining({ answer: "Yes", question: expect.stringContaining("authorized") }),
       expect.objectContaining({ answer: "Yes", question: expect.stringContaining("sponsorship") }),
     ]);
-    expect(db.select().from(apiUsage).all()).toEqual([expect.objectContaining({ purpose: "tailoring", model: "claude-sonnet-5-5" })]);
+    expect(db.select().from(apiUsage).all()).toEqual([
+      expect.objectContaining({ purpose: "tailoring", model: "claude-sonnet-5-5" }),
+      expect.objectContaining({ purpose: "note", model: "claude-sonnet-5-5" }),
+    ]);
     const job = db.select().from(jobs).where(eq(jobs.id, jobId)).get()!;
     expect(job.status).toBe("shortlisted");
   });
 
-  it("Tier B: base resume and standard answers, no AI call; placeholders in standard answers block it", async () => {
+  it("Tier B: base resume and standard answers, no tailoring; placeholders in standard answers block it", async () => {
     const { tailor, calls } = fakeTailor();
-    setup({ getTailor: () => ({ tailor }) });
+    setup({ getTailor: () => ({ tailor }), getNoteWriter: undefined });
     db.update(settings).set({ standardAnswers: DEFAULT_SETTINGS.standardAnswers }).run();
     await saveBases();
     const jobId = await addJob("Software Engineer", "B");
@@ -283,7 +287,7 @@ describe("base resume first, notes for every application, restart, background pr
     let n = 0;
     setup({
       getNoteWriter: () => ({
-        writer: async () => ({ note: `Note number ${++n} about the Word Splitter feature.`, model: "claude-sonnet-5-5", usage: { inputTokens: 1, outputTokens: 1, cacheReadTokens: 0, cacheWriteTokens: 0 } }),
+        writer: async () => ({ note: `Note number ${++n} about the Word Splitter feature.`, basis: { companyValue: `Value ${n}`, valueSource: "", story: "s", standout: "x" }, model: "claude-sonnet-5-5", usage: { inputTokens: 1, outputTokens: 1, cacheReadTokens: 0, cacheWriteTokens: 0 } }),
       }),
     });
     await saveBases();
@@ -292,6 +296,7 @@ describe("base resume first, notes for every application, restart, background pr
     expect(a.recruiterNote).toBe("Note number 1 about the Word Splitter feature.");
     const again = await req("POST", `/api/applications/${a.id}/note`);
     expect(again.body.recruiterNote).toBe("Note number 2 about the Word Splitter feature.");
+    expect(again.body.noteBasis.companyValue).toBe("Value 2");
   });
 
   it("the contact line can be fixed right in the application", async () => {

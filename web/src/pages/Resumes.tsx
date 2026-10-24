@@ -99,9 +99,14 @@ export function Resumes() {
             <>
               <p className="text-[15px] text-ink-soft">
                 {base.pdfPages === 1 ? "Fits on one page." : `${base.pdfPages} pages. Trim it to one.`}{" "}
+                <a className="font-medium text-accent underline underline-offset-2" href={`/api/resumes/bases/${type}/file.pdf?v=${base.id}`} target="_blank" rel="noreferrer">Open PDF</a>
+                {" · "}
                 <a className="font-medium text-accent underline underline-offset-2" href={`/api/resumes/bases/${type}/file.docx`}>Download DOCX</a>
               </p>
-              <iframe title={`${LABEL[type]} PDF`} src={`/api/resumes/bases/${type}/file.pdf?v=${base.id}`} className="h-[760px] w-full rounded-md border border-line bg-white" />
+              <details>
+                <summary className="cursor-pointer text-[15px] font-medium text-ink-soft">Preview the PDF here</summary>
+                <iframe title={`${LABEL[type]} PDF`} src={`/api/resumes/bases/${type}/file.pdf?v=${base.id}`} className="mt-3 h-[760px] w-full rounded-md border border-line bg-white" />
+              </details>
             </>
           ) : (
             <div className="rounded-lg border border-dashed border-line p-6 text-[15px] text-ink-soft">

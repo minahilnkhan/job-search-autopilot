@@ -1,3 +1,4 @@
+import type { NoteWriter } from "../src/llm/note";
 import { createDb, runMigrations } from "../src/db/client";
 import { seed } from "../src/db/seed";
 import type { EmploymentFlags, ExtractedFields } from "../../shared/types";
@@ -62,7 +63,6 @@ export function fakeTailor(plan: Partial<TailorPlan> = {}) {
       plan: {
         lineEdits: [],
         bulletOrder: [],
-        recruiterNote: "I built a production Claude pipeline at Acme Learning and would like to do the same for your customers.",
         answers: input.questions.map((q) => ({ question: q, answer: "I owned the Word Splitter feature end to end." })),
         keywordsCovered: ["LLM"],
         keywordsMissing: ["Kubernetes"],
@@ -74,9 +74,18 @@ export function fakeTailor(plan: Partial<TailorPlan> = {}) {
   return { tailor, calls };
 }
 
+export const FAKE_NOTE_BASIS = { companyValue: "Customer focus", valueSource: "work directly with customers", story: "Word Splitter", standout: "Teachers fact-checked it" };
+const fakeNoteWriter: NoteWriter = async () => ({
+  note: "I built a production Claude pipeline at Acme Learning and would like to do the same for your customers.",
+  basis: FAKE_NOTE_BASIS,
+  model: "claude-sonnet-5-5",
+  usage: { inputTokens: 1, outputTokens: 1, cacheReadTokens: 0, cacheWriteTokens: 0 },
+});
+
 export function prepDeps(over: Partial<PrepDeps> = {}): PrepDeps {
   return {
     getTailor: () => ({ tailor: fakeTailor().tailor }),
+    getNoteWriter: () => ({ writer: fakeNoteWriter }),
     renderer: fakeRenderer(),
     facts: () => FIXTURE_FACTS,
     generatedDir: fs.mkdtempSync(path.join(os.tmpdir(), "autopilot-test-")),

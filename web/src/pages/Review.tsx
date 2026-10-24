@@ -255,7 +255,10 @@ function Detail({ id, onChanged, onOpen }: { id: number; onChanged: () => void; 
         )}
 
         {app.hasPdf ? (
-          <iframe title="Resume PDF preview" src={pdfUrl} className="h-[720px] w-full rounded-md border border-line bg-white" />
+          <details className="border-t border-line pt-4">
+            <summary className="cursor-pointer text-[15px] font-medium text-ink-soft">Preview the PDF here</summary>
+            <iframe title="Resume PDF preview" src={pdfUrl} className="mt-3 h-[720px] w-full rounded-md border border-line bg-white" />
+          </details>
         ) : (
           <p className="text-[15px] text-fail">No PDF yet. See the PDF issue above.</p>
         )}
@@ -271,6 +274,19 @@ function Detail({ id, onChanged, onOpen }: { id: number; onChanged: () => void; 
           )}
         </div>
         <p className="text-sm text-ink-soft">A draft from your inventory, for the application form or a LinkedIn message. Edit it freely.</p>
+        {app.noteBasis && (
+          <dl className="grid gap-x-3 gap-y-1 rounded-md bg-paper p-3 text-sm sm:grid-cols-[auto_minmax(0,1fr)]">
+            <dt className="font-medium text-ink-soft">Built around</dt>
+            <dd>
+              {app.noteBasis.companyValue}
+              {app.noteBasis.valueSource ? <span className="text-ink-soft"> (posting: "{app.noteBasis.valueSource}")</span> : <span className="text-ink-soft"> (the posting states no values)</span>}
+            </dd>
+            <dt className="font-medium text-ink-soft">Shown through</dt>
+            <dd>{app.noteBasis.story}</dd>
+            <dt className="font-medium text-ink-soft">Standout</dt>
+            <dd>{app.noteBasis.standout}</dd>
+          </dl>
+        )}
         <textarea aria-label="Recruiter note" className="field font-serif" rows={5} value={note} disabled={!editable} onChange={(e) => setNote(e.target.value)}
           placeholder={editable ? "No note yet. Press Write a note." : ""} />
         <p className={`text-sm ${words(note) >= 100 ? "text-fail" : "text-ink-soft"}`}>{words(note)} of 99 words</p>

@@ -1,0 +1,1 @@
+ALTER TABLE `applications` ADD `note_basis` text;

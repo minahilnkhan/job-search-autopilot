@@ -9,7 +9,6 @@ import { resumeLines, setLine } from "./resumeFormat";
 export type TailorPlan = {
   lineEdits: { id: string; after: string; reason: string }[];
   bulletOrder: { entry: string; order: number[] }[]; // entry = "section.entry", order = old bullet indices
-  recruiterNote: string;
   answers: { question: string; answer: string }[];
   keywordsCovered: string[];
   keywordsMissing: string[];

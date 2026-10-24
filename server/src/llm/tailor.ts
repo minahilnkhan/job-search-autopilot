@@ -19,7 +19,7 @@ export type Tailor = (input: TailorInput) => Promise<TailorResult>;
 const SCHEMA = {
   type: "object",
   additionalProperties: false,
-  required: ["lineEdits", "bulletOrder", "recruiterNote", "answers", "keywordsCovered", "keywordsMissing", "honestGaps"],
+  required: ["lineEdits", "bulletOrder", "answers", "keywordsCovered", "keywordsMissing", "honestGaps"],
   properties: {
     lineEdits: {
       type: "array",
@@ -45,7 +45,6 @@ const SCHEMA = {
         properties: { entry: { type: "string" }, order: { type: "array", items: { type: "integer" } } },
       },
     },
-    recruiterNote: { type: "string", description: "Under 90 words, to the recruiter or hiring manager. No placeholders." },
     answers: {
       type: "array",
       items: {
@@ -64,7 +63,6 @@ const SCHEMA = {
 const planSchema = z.object({
   lineEdits: z.array(z.object({ id: z.string(), after: z.string(), reason: z.string() })),
   bulletOrder: z.array(z.object({ entry: z.string(), order: z.array(z.number().int()) })),
-  recruiterNote: z.string(),
   answers: z.array(z.object({ question: z.string(), answer: z.string() })),
   keywordsCovered: z.array(z.string()),
   keywordsMissing: z.array(z.string()),
@@ -81,7 +79,6 @@ You get the base resume with every line tagged [id], the job posting, and questi
 - Keep her real ownership level: for work a senior engineer designed (submit/poll APIs, workers, caching), say "integrated" or "extended", never "designed", "built" or "architected".
 - No banned words (spearheaded, leveraged, utilized, passionate, robust, seamless, cutting-edge, dynamic, results-driven, synergy, "responsible for").
 - bulletOrder: optionally move the most relevant bullets first within an entry.
-- recruiterNote: under 90 words, specific to this company and role, first person, no placeholders, no greeting with a made-up name.
 - answers: answer each listed question in 2–4 sentences, from inventory facts only. Never answer work-authorization or sponsorship questions; those are fixed elsewhere.
 - keywordsCovered / keywordsMissing: the job's key terms her resume now covers vs. doesn't. honestGaps: requirements she can't honestly claim.
 

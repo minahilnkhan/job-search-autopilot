@@ -83,9 +83,12 @@ describe("request settings (thinking counts toward max_tokens)", () => {
     const fetchStub = (async (_url: string, init: RequestInit) => {
       const body = JSON.parse(String(init.body));
       bodies.push(body);
-      const text = body.output_config.format.schema.required.includes("lineEdits")
-        ? JSON.stringify({ lineEdits: [], bulletOrder: [], recruiterNote: "Hi.", answers: [], keywordsCovered: [], keywordsMissing: [], honestGaps: [] })
-        : JSON.stringify(GOOD_JUDGMENT);
+      const req = body.output_config.format.schema.required as string[];
+      const text = req.includes("lineEdits")
+        ? JSON.stringify({ lineEdits: [], bulletOrder: [], answers: [], keywordsCovered: [], keywordsMissing: [], honestGaps: [] })
+        : req.includes("recruiterNote")
+          ? JSON.stringify({ companyValue: "Ownership", valueSource: "you own problems end to end", story: "Morphemic Dictionary", standout: "Teachers checked it", recruiterNote: " A note. " })
+          : JSON.stringify(GOOD_JUDGMENT);
       return new Response(
         JSON.stringify({ id: "m", type: "message", role: "assistant", model: body.model, content: [{ type: "text", text }], stop_reason: "end_turn", stop_sequence: null, usage: { input_tokens: 10, output_tokens: 10 } }),
         { status: 200, headers: { "content-type": "application/json" } }
@@ -110,5 +113,16 @@ describe("request settings (thinking counts toward max_tokens)", () => {
     await tailor({ companyName: "Acme", title: "FDE", location: null, description: "JD", baseResume: "[0.0.0] x", questions: [] });
     expect(bodies[0]).toMatchObject({ max_tokens: 16000, output_config: { effort: "medium" } });
     expect(bodies[0]).not.toHaveProperty("thinking");
+  });
+
+  it("the note writer sends company notes, returns what the note is built around, and has room to think", async () => {
+    const { makeAnthropicNoteWriter } = await import("../src/llm/note");
+    const { bodies, fetchStub } = capture();
+    const write = makeAnthropicNoteWriter({ apiKey: "test", model: "claude-sonnet-5-5", context, fetch: fetchStub });
+    const r = await write({ companyName: "Acme", title: "FDE", description: "JD", resumeText: "# Me", companyNotes: "Values: ownership" });
+    expect(r.note).toBe("A note.");
+    expect(r.basis).toEqual({ companyValue: "Ownership", valueSource: "you own problems end to end", story: "Morphemic Dictionary", standout: "Teachers checked it" });
+    expect(bodies[0]).toMatchObject({ output_config: { effort: "medium" }, max_tokens: 8000 });
+    expect(JSON.stringify(bodies[0]!.messages)).toContain("<company_notes>\\nValues: ownership");
   });
 });

@@ -259,6 +259,14 @@ export type ApplicationSummary = {
   createdAt: number;
 };
 
+/** What a recruiter note was built around: shown under the note in Review. */
+export type NoteBasis = {
+  companyValue: string; // e.g. "Customer obsession"
+  valueSource: string; // the posting's own words for it, or "" if the posting states none
+  story: string; // which inventory story shows it
+  standout: string; // the one memorable detail
+};
+
 export type ApplicationDetail = ApplicationSummary & {
   job: Job;
   baseType: BaseType;
@@ -266,6 +274,7 @@ export type ApplicationDetail = ApplicationSummary & {
   resumeText: string;
   changes: ResumeChange[];
   recruiterNote: string | null;
+  noteBasis: NoteBasis | null;
   answers: Answer[];
   truth: TruthReport;
   pdfPages: number | null;

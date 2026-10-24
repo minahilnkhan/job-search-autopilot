@@ -19,6 +19,7 @@ import { getSettings, localDate } from "./settings";
 import { recordUsage } from "./usage";
 import { getBaseRow, resumeCheckLines, withRenderIssues } from "./resumes";
 import type {
+  NoteBasis,
   Answer,
   ApplicationDetail,
   ApplicationStatus,
@@ -103,14 +104,21 @@ async function draftNote(
   settings: Settings,
   deps: PrepDeps,
   now: Date
-): Promise<{ note: string } | { problem: string }> {
+): Promise<{ note: string; basis: NoteBasis } | { problem: string }> {
   const w = deps.getNoteWriter?.(settings);
   if (!w) return { problem: "note writing isn't set up" };
   if ("unavailable" in w) return { problem: w.unavailable };
   try {
-    const r = await w.writer({ companyName: args.companyName, title: args.title, description: args.description, resumeText: serializeResume(args.content) });
+    const company = db.select({ notes: companies.notes }).from(companies).innerJoin(jobs, eq(jobs.companyId, companies.id)).where(eq(jobs.id, args.jobId)).get();
+    const r = await w.writer({
+      companyName: args.companyName,
+      title: args.title,
+      description: args.description,
+      resumeText: serializeResume(args.content),
+      companyNotes: company?.notes ?? null,
+    });
     recordUsage(db, { purpose: "note", model: r.model, usage: r.usage, jobId: args.jobId, now });
-    return { note: r.note };
+    return { note: r.note, basis: r.basis };
   } catch (err) {
     if (err instanceof ScoreError && err.usage) recordUsage(db, { purpose: "note", model: settings.models.tailoring, usage: err.usage, jobId: args.jobId, now });
     return { problem: accountProblem(err) ?? (err as Error).message };
@@ -129,6 +137,7 @@ export async function redraftNote(db: DB, id: number, deps: PrepDeps, now = new 
     now
   );
   if ("problem" in n) throw new ConflictError(`Couldn't write a note: ${n.problem}`);
+  db.update(applications).set({ noteBasis: n.basis }).where(eq(applications.id, id)).run();
   return editApplication(db, id, { recruiterNote: n.note }, deps, now);
 }
 
@@ -177,6 +186,7 @@ export async function prepareApplication(db: DB, jobId: number, deps: PrepDeps, 
   let content = base.content;
   let changes: ResumeChange[] = [];
   let recruiterNote: string | null = null;
+  let noteBasis: NoteBasis | null = null;
   let generated: Answer[] = [];
   let tailoring: AppRow["tailoring"] = null;
 
@@ -199,7 +209,6 @@ export async function prepareApplication(db: DB, jobId: number, deps: PrepDeps, 
         content = applied.content;
         changes = applied.changes;
         notes.push(...applied.notes);
-        recruiterNote = result.plan.recruiterNote.trim() || null;
         generated = result.plan.answers.map((a) => ({ ...a, source: "generated" as const }));
         tailoring = { keywordsCovered: result.plan.keywordsCovered, keywordsMissing: result.plan.keywordsMissing, honestGaps: result.plan.honestGaps };
       } catch (err) {
@@ -210,11 +219,11 @@ export async function prepareApplication(db: DB, jobId: number, deps: PrepDeps, 
     }
   }
 
-  // Every application gets a recruiter note you can edit. Tier A's comes from
-  // tailoring; otherwise a short separate call writes one.
-  if (!recruiterNote) {
+  // Every application gets a recruiter note you can edit, from one writer
+  // with one brief (llm/note.ts), whatever the tier.
+  {
     const n = await draftNote(db, { jobId, companyName: job.companyName, title: job.title, description: job.description, content }, settings, deps, now);
-    if ("note" in n) recruiterNote = n.note;
+    if ("note" in n) ({ note: recruiterNote, basis: noteBasis } = n);
     else notes.push(`No recruiter note yet (${n.problem}). Use "Write a note" below.`);
   }
 
@@ -227,7 +236,7 @@ export async function prepareApplication(db: DB, jobId: number, deps: PrepDeps, 
   const version = db.insert(resumeVersions).values({ baseType, parentId: base.id, jobId, content, diffFromBase: changes }).returning().get();
   const app = db
     .insert(applications)
-    .values({ jobId, tier, resumeVersionId: version.id, recruiterNote, answers, status: "draft", prepNotes: notes, tailoring, lastActivityAt: now })
+    .values({ jobId, tier, resumeVersionId: version.id, recruiterNote, noteBasis, answers, status: "draft", prepNotes: notes, tailoring, lastActivityAt: now })
     .returning()
     .get();
   db.update(jobs).set({ status: "shortlisted" }).where(eq(jobs.id, jobId)).run();
@@ -299,6 +308,7 @@ export function getApplication(db: DB, id: number): ApplicationDetail {
     resumeText: serializeResume(version.content),
     changes: version.diffFromBase ?? [],
     recruiterNote: row.app.recruiterNote,
+    noteBasis: row.app.noteBasis ?? null,
     answers: row.app.answers ?? [],
     truth: row.app.truthReport ?? { pass: false, issues: [], checkedAt: 0 },
     pdfPages: version.pdfPages,

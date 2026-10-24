@@ -9,6 +9,7 @@ import {
   type AnySQLiteColumn,
 } from "drizzle-orm/sqlite-core";
 import type {
+  NoteBasis,
   Answer,
   ExtractedFields,
   ResumeChange,
@@ -139,6 +140,8 @@ export const applications = sqliteTable(
     snoozedUntil: text("snoozed_until"), // YYYY-MM-DD
     prepNotes: text("prep_notes", { mode: "json" }).$type<string[]>(),
     tailoring: text("tailoring", { mode: "json" }).$type<{ keywordsCovered: string[]; keywordsMissing: string[]; honestGaps: string[] }>(),
+    // What the recruiter note was built around, so you can judge and edit it.
+    noteBasis: text("note_basis", { mode: "json" }).$type<NoteBasis>(),
     createdAt: createdAt(),
   },
   (t) => [index("applications_job_idx").on(t.jobId)]
