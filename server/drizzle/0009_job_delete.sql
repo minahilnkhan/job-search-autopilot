@@ -1,0 +1,1 @@
+ALTER TABLE `jobs` ADD `deleted_at` integer;

@@ -20,7 +20,7 @@ const VIEWS: { id: View; label: string; test: (j: JobListItem) => boolean }[] = 
 const SPONSORSHIP_LABEL = { yes: "Sponsors", no: "No sponsorship", unstated: "Sponsorship not stated" } as const;
 const SOURCE_LABEL: Record<string, string> = { manual: "Pasted", greenhouse: "Greenhouse", lever: "Lever", ashby: "Ashby" };
 
-function JobRow({ job, onChange }: { job: JobListItem; onChange: (j: JobListItem) => void }) {
+function JobRow({ job, onChange, selected, onSelect }: { job: JobListItem; onChange: (j: JobListItem) => void; selected: boolean; onSelect: (on: boolean) => void }) {
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<ExtractedFields | null>(null);
   const [description, setDescription] = useState<string | null>(null);
@@ -49,8 +49,12 @@ function JobRow({ job, onChange }: { job: JobListItem; onChange: (j: JobListItem
   ];
 
   return (
-    <li className="panel">
-      <button className="flex w-full flex-wrap items-start justify-between gap-3 p-4 text-left" aria-expanded={open} onClick={() => setOpen((o) => !o)}>
+    <li className={`panel ${selected ? "border-accent" : ""}`}>
+      <div className="flex items-start">
+      <label className="flex cursor-pointer items-center self-stretch pl-4" title="Select">
+        <input type="checkbox" className="h-4 w-4 accent-accent" checked={selected} onChange={(e) => onSelect(e.target.checked)} aria-label={`Select ${job.title} at ${job.companyName}`} />
+      </label>
+      <button className="flex min-w-0 flex-1 flex-wrap items-start justify-between gap-3 p-4 text-left" aria-expanded={open} onClick={() => setOpen((o) => !o)}>
         <div className="min-w-0">
           <p className="font-semibold">
             {job.title}
@@ -67,6 +71,7 @@ function JobRow({ job, onChange }: { job: JobListItem; onChange: (j: JobListItem
           <VerdictBadge pass={job.hardFilterPass} reasons={job.filterReasons} />
         </div>
       </button>
+      </div>
 
       {open && (
         <div className="space-y-5 border-t border-line p-4">
@@ -125,6 +130,10 @@ function JobRow({ job, onChange }: { job: JobListItem; onChange: (j: JobListItem
 export function Jobs({ jobs, setJobs }: { jobs: JobListItem[]; setJobs: (fn: (j: JobListItem[]) => JobListItem[]) => void }) {
   const [view, setView] = useState<View>("all");
   const [offTarget, setOffTarget] = useState<JobListItem[] | null>(null);
+  const [selected, setSelected] = useState<Set<number>>(new Set());
+  const [confirming, setConfirming] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
 
   // Off-target board postings aren't in the main list (there can be hundreds); load them on demand.
   useEffect(() => {
@@ -135,6 +144,38 @@ export function Jobs({ jobs, setJobs }: { jobs: JobListItem[]; setJobs: (fn: (j:
   const source = view === "offTarget" ? (offTarget ?? []) : jobs;
   const shown = source.filter(active.test).sort((a, b) => (b.fitScore ?? -1) - (a.fitScore ?? -1) || b.createdAt - a.createdAt);
   const replace = (updated: JobListItem) => setJobs((all) => all.map((j) => (j.id === updated.id ? { ...j, ...updated } : j)));
+  const picked = shown.filter((j) => selected.has(j.id));
+  const allPicked = shown.length > 0 && picked.length === shown.length;
+  const select = (id: number, on: boolean) =>
+    setSelected((s) => {
+      const n = new Set(s);
+      if (on) n.add(id);
+      else n.delete(id);
+      return n;
+    });
+
+  async function deletePicked() {
+    setBusy(true);
+    setMessage(null);
+    try {
+      const ids = picked.map((j) => j.id);
+      const r = await api.deleteJobs(ids);
+      const keptIds = new Set(r.kept.map((k) => k.id));
+      const gone = new Set(ids.filter((id) => !keptIds.has(id)));
+      setJobs((all) => all.filter((j) => !gone.has(j.id)));
+      setOffTarget((o) => o && o.filter((j) => !gone.has(j.id)));
+      setSelected(new Set());
+      setConfirming(false);
+      setMessage({
+        ok: true,
+        text: `Deleted ${r.deleted} job${r.deleted === 1 ? "" : "s"}.${r.kept.length ? ` Kept ${r.kept.length} you've already submitted an application for (they stay on the Tracker).` : ""}`,
+      });
+    } catch (err) {
+      setMessage({ ok: false, text: (err as Error).message });
+    } finally {
+      setBusy(false);
+    }
+  }
 
   return (
     <section className="max-w-4xl space-y-5">
@@ -152,7 +193,11 @@ export function Jobs({ jobs, setJobs }: { jobs: JobListItem[]; setJobs: (fn: (j:
           return (
             <button
               key={v.id}
-              onClick={() => setView(v.id)}
+              onClick={() => {
+                setView(v.id);
+                setSelected(new Set());
+                setConfirming(false);
+              }}
               aria-pressed={view === v.id}
               className={`rounded-md px-3 py-1.5 text-[15px] font-medium ${view === v.id ? "bg-ink text-white" : "text-ink-soft hover:bg-surface"}`}
             >
@@ -166,6 +211,30 @@ export function Jobs({ jobs, setJobs }: { jobs: JobListItem[]; setJobs: (fn: (j:
         <p className="text-[15px] text-ink-soft">Job-board postings outside your target roles (FDE, solutions, deployment, applied AI, new-grad or full-stack/backend SWE). They're kept so they aren't checked again, and they're never scored. To score one anyway, add it on Add a job.</p>
       )}
 
+      {shown.length > 0 && (
+        <div className="flex flex-wrap items-center gap-3">
+          <label className="flex items-center gap-2 text-[15px]">
+            <input type="checkbox" className="h-4 w-4 accent-accent" checked={allPicked}
+              ref={(el) => {
+                if (el) el.indeterminate = picked.length > 0 && !allPicked;
+              }}
+              onChange={(e) => setSelected(e.target.checked ? new Set(shown.map((j) => j.id)) : new Set())} />
+            Select all {shown.length}
+          </label>
+          {picked.length > 0 && !confirming && (
+            <button className="btn-quiet py-1.5 text-fail" onClick={() => setConfirming(true)}>Delete {picked.length}</button>
+          )}
+          {confirming && (
+            <span className="flex flex-wrap items-center gap-2 rounded-md bg-fail-bg px-3 py-1.5 text-[15px]">
+              Delete {picked.length} job{picked.length === 1 ? "" : "s"}? Applications you haven't submitted are withdrawn. The daily run won't add them back.
+              <button className="btn-primary bg-fail py-1 hover:bg-fail" disabled={busy} onClick={deletePicked}>{busy ? "Deleting…" : "Delete"}</button>
+              <button className="btn-quiet py-1" onClick={() => setConfirming(false)}>Cancel</button>
+            </span>
+          )}
+        </div>
+      )}
+      {message && <p className={`text-[15px] ${message.ok ? "text-pass" : "text-fail"}`} role="status">{message.text}</p>}
+
       {shown.length === 0 ? (
         <div className="rounded-lg border border-dashed border-line p-6">
           <p className="font-medium">{jobs.length === 0 ? "No jobs yet" : `No ${active.label.toLowerCase()} jobs`}</p>
@@ -176,7 +245,7 @@ export function Jobs({ jobs, setJobs }: { jobs: JobListItem[]; setJobs: (fn: (j:
       ) : (
         <ul className="space-y-3">
           {shown.map((j) => (
-            <JobRow key={j.id} job={j} onChange={replace} />
+            <JobRow key={j.id} job={j} onChange={replace} selected={selected.has(j.id)} onSelect={(on) => select(j.id, on)} />
           ))}
         </ul>
       )}

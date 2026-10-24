@@ -97,6 +97,8 @@ export const jobs = sqliteTable(
       .default("new"),
     // Not in the original spec: company|normalized title|normalized location, for dedupe.
     dedupeKey: text("dedupe_key").notNull(),
+    // Deleted from the Jobs page. The row stays so the daily fetch doesn't add the posting back.
+    deletedAt: integer("deleted_at", { mode: "timestamp_ms" }),
     createdAt: createdAt(),
   },
   (t) => [

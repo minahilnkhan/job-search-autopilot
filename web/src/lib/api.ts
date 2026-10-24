@@ -60,6 +60,7 @@ export const api = {
   createCompany: (body: Partial<Company> & { name: string }) => request<Company>("POST", "/api/companies", body),
   updateCompany: (id: number, body: Partial<Company>) =>
     request<{ company: Company; refilteredJobs: number }>("PATCH", `/api/companies/${id}`, body),
+  deleteJobs: (ids: number[]) => request<{ deleted: number; kept: { id: number; title: string; reason: string }[] }>("POST", "/api/jobs/delete", { ids }),
   getSettings: () => request<Settings>("GET", "/api/settings"),
   saveSettings: (body: Settings) => request<Settings>("PUT", "/api/settings", body),
   runPipeline: () => request<{ started: boolean }>("POST", "/api/pipeline/run", {}),

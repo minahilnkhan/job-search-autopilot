@@ -64,6 +64,13 @@
       "when": 1792822859488,
       "tag": "0008_own_browser",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "6",
+      "when": 1792823397025,
+      "tag": "0009_job_delete",
+      "breakpoints": true
     }
   ]
 }

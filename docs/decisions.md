@@ -187,3 +187,6 @@ Her tailoring notes (docs/tailoring.md) are condensed into the prompt. The plan 
 
 ### Spam blocks: switch to her browser, don't evade
 Ashby rejected a submission from the automated window as "possible spam". Making the window look human (stealth plugins, fake typing delays) would be bot-detection bypass, which the spec rules out, and could get her applications silently dropped. Instead, Settings has a list of sites to apply to in her own browser (Ashby by default). For those, the app opens a hidden window only to read the form's questions, prepares every answer (including drafted ones and her chat replies) in the form's order, and she pastes them. If any other site shows a spam block, the app notices, tells her not to resubmit there, and adds the site to the list.
+
+### Deleting jobs is a soft delete
+The Jobs page can select one, several or all jobs in the current view and delete them. A deleted job keeps its row (with `deleted_at`) so the daily fetch's dedupe still sees it and doesn't add the same posting back; it's hidden everywhere and never scored. Applications that weren't submitted are withdrawn with it ("Job deleted"); jobs with a submitted application are kept, because the Tracker needs them. Pasting a deleted job again brings it back.

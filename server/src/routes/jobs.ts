@@ -3,12 +3,19 @@ import type { DB } from "../db/client";
 import { extractFields } from "../domain/extract";
 import { runHardFilters } from "../domain/hardFilters";
 import { applicationHistory } from "../services/history";
-import { createJob, getJob, listJobs, updateJob } from "../services/jobs";
+import { createJob, deleteJobs, getJob, listJobs, updateJob } from "../services/jobs";
+import { z } from "zod";
 import { companies } from "../db/schema";
 import { sql } from "drizzle-orm";
 import { createJobBody, extractBody, idParam, patchJobBody, previewBody } from "./validation";
 
 export function jobRoutes(app: FastifyInstance, db: DB) {
+  // Delete several jobs at once (Jobs page, select all). Submitted ones are kept.
+  app.post("/api/jobs/delete", async (req) => {
+    const { ids } = z.object({ ids: z.array(z.number().int().positive()).min(1).max(5000) }).parse(req.body);
+    return deleteJobs(db, ids);
+  });
+
   // Step 1 of manual paste: regex extraction to prefill the review form. Nothing is saved.
   app.post("/api/jobs/extract", async (req) => {
     const body = extractBody.parse(req.body);

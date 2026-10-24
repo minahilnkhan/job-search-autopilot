@@ -151,3 +151,35 @@ describe("updateJob / refilter", () => {
     expect(updateJob(db, job.id, {}, NOW).filterReasons).toEqual([]);
   });
 });
+
+describe("deleting jobs", () => {
+  it("deletes selected jobs, withdraws unsubmitted applications, keeps submitted ones, and a re-paste brings one back", async () => {
+    const { buildApp } = await import("../src/app");
+    const { applications, jobs } = await import("../src/db/schema");
+    const { makeTestDb, OFFLINE_PIPELINE, prepDeps, FDE_JD } = await import("./helpers");
+    const { eq } = await import("drizzle-orm");
+    const db = makeTestDb();
+    const app = buildApp(db, { pipeline: OFFLINE_PIPELINE, prep: prepDeps() });
+    const req = async (method: "GET" | "POST", url: string, payload?: unknown) => {
+      const res = await app.inject({ method, url, payload: payload as object });
+      return { status: res.statusCode, body: res.json() };
+    };
+    const add = async (title: string) => (await req("POST", "/api/jobs", { companyName: "Acme AI", title, location: "Chicago, IL", description: FDE_JD })).body.job.id as number;
+    const a = await add("Software Engineer");
+    const b = await add("Solutions Engineer");
+    const c = await add("Forward Deployed Engineer");
+    db.update(jobs).set({ status: "shortlisted" }).where(eq(jobs.id, b)).run();
+    db.insert(applications).values({ jobId: b, tier: "B", status: "approved" }).run();
+    db.insert(applications).values({ jobId: c, tier: "A", status: "submitted", submittedAt: new Date() }).run();
+
+    const r = await req("POST", "/api/jobs/delete", { ids: [a, b, c] });
+    expect(r.body.deleted).toBe(2);
+    expect(r.body.kept).toEqual([expect.objectContaining({ id: c })]);
+    expect((await req("GET", "/api/jobs")).body.map((j: { id: number }) => j.id)).toEqual([c]);
+    expect(db.select().from(applications).where(eq(applications.jobId, b)).get()).toMatchObject({ status: "withdrawn", reviewReason: "Job deleted" });
+
+    const back = await req("POST", "/api/jobs", { companyName: "Acme AI", title: "Software Engineer", location: "Chicago, IL", description: FDE_JD });
+    expect(back.body).toMatchObject({ duplicate: true, job: { id: a, status: "new" } });
+    expect((await req("GET", "/api/jobs")).body.map((j: { id: number }) => j.id).sort()).toEqual([a, c].sort());
+  });
+});
