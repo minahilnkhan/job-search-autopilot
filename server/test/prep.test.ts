@@ -196,7 +196,10 @@ describe("preparing", () => {
 
 describe("PDF problems block approval and can't be overridden", () => {
   it("a two-page resume is held back", async () => {
-    setup({ renderer: fakeRenderer({ pages: 2 }) });
+    // Base renders on one page; the tailored application spills onto two.
+    const one = fakeRenderer({ pages: 1 });
+    const two = fakeRenderer({ pages: 2 });
+    setup({ renderer: (content, dir) => (dir.includes("applications") ? two(content, dir) : one(content, dir)) });
     await saveBases();
     const jobId = await addJob("Forward Deployed Engineer", "A");
     const { body } = await req("POST", "/api/applications", { jobId });
@@ -207,10 +210,10 @@ describe("PDF problems block approval and can't be overridden", () => {
   });
 
   it("no Chromium → clear setup message", async () => {
-    setup({ renderer: fakeRenderer({ pdfError: 'Run "npx playwright install chromium"' }) });
+    setup({ renderer: fakeRenderer({ pdfError: 'Run "npm run setup:pdf"' }) });
     await saveBases();
     const base = (await req("GET", "/api/resumes/bases")).body[0];
-    expect(base.truth.issues[0].message).toContain("npx playwright install chromium");
+    expect(base.truth.issues[0].message).toContain("npm run setup:pdf");
   });
 });
 
@@ -263,5 +266,66 @@ describe("override, reject, snooze", () => {
     expect((await req("PATCH", `/api/applications/${a.id}`, { recruiterNote: "x" })).status).toBe(409);
     const row = db.select().from(applications).where(eq(applications.id, a.id)).get()!;
     expect(row.approvedAt).not.toBeNull();
+  });
+});
+
+describe("base resume first, notes for every application, restart, background prep", () => {
+  it("won't prepare from a base resume that still has problems, and says what to fix", async () => {
+    await req("PUT", "/api/resumes/bases/fde", { text: FIXTURE_RESUME.replace("test@example.com", "[email]") });
+    const jobId = await addJob("Forward Deployed Engineer", "A");
+    const res = await req("POST", "/api/applications", { jobId });
+    expect(res.status).toBe(409);
+    expect(res.body.error).toContain("FDE base resume has 1 problem");
+    expect(res.body.error).toContain("Fill in [email]");
+  });
+
+  it("Tier B gets a recruiter note too; 'Write a note' redrafts it", async () => {
+    let n = 0;
+    setup({
+      getNoteWriter: () => ({
+        writer: async () => ({ note: `Note number ${++n} about the Word Splitter feature.`, model: "claude-sonnet-5-5", usage: { inputTokens: 1, outputTokens: 1, cacheReadTokens: 0, cacheWriteTokens: 0 } }),
+      }),
+    });
+    await saveBases();
+    const jobId = await addJob("Software Engineer", "B");
+    const a = (await req("POST", "/api/applications", { jobId })).body;
+    expect(a.recruiterNote).toBe("Note number 1 about the Word Splitter feature.");
+    const again = await req("POST", `/api/applications/${a.id}/note`);
+    expect(again.body.recruiterNote).toBe("Note number 2 about the Word Splitter feature.");
+  });
+
+  it("the contact line can be fixed right in the application", async () => {
+    await saveBases();
+    const jobId = await addJob("Software Engineer", "B");
+    const a = (await req("POST", "/api/applications", { jobId })).body;
+    const res = await req("PATCH", `/api/applications/${a.id}`, { contact: "Chicago, IL | me@example.com" });
+    expect(res.body.resume.contact).toBe("Chicago, IL | me@example.com");
+  });
+
+  it("restart rebuilds from the current base and closes the old application", async () => {
+    await saveBases();
+    const jobId = await addJob("Software Engineer", "B");
+    const a = (await req("POST", "/api/applications", { jobId })).body;
+    await req("PUT", "/api/resumes/bases/swe", { text: FIXTURE_RESUME.replace("Test Person", "Test Q. Person") });
+    const b = (await req("POST", `/api/applications/${a.id}/restart`)).body;
+    expect(b.id).not.toBe(a.id);
+    expect(b.resume.name).toBe("Test Q. Person");
+    expect((await req("GET", `/api/applications/${a.id}`)).body.status).toBe("withdrawn");
+  });
+
+  it("background prepare returns at once and shows up as in progress", async () => {
+    let release!: () => void;
+    const gate = new Promise<void>((r) => (release = r));
+    const { tailor } = fakeTailor();
+    setup({ getTailor: () => ({ tailor: async (i) => (await gate, tailor(i)) }) });
+    await saveBases();
+    const jobId = await addJob("Forward Deployed Engineer", "A");
+    const res = await req("POST", "/api/applications", { jobId, background: true });
+    expect(res.status).toBe(202);
+    expect((await req("GET", "/api/applications/preparing")).body).toEqual([expect.objectContaining({ jobId, error: null })]);
+    expect(db.select().from(jobs).where(eq(jobs.id, jobId)).get()!.status).toBe("shortlisted");
+    release();
+    for (let i = 0; i < 50 && (await req("GET", "/api/applications/preparing")).body.length; i++) await new Promise((r) => setTimeout(r, 10));
+    expect((await req("GET", "/api/applications?view=review")).body).toHaveLength(1);
   });
 });

@@ -32,7 +32,7 @@ Every morning (7:00 Chicago by default, or **Run now**):
 1. **Fetch** every open posting from each company's public Greenhouse, Lever or Ashby job-board API.
 2. **Dedupe and filter** with the same Phase 1 rules. Job-board postings also have to match your target roles (FDE, solutions, deployment, implementation, applied AI, new-grad or full-stack/backend SWE), and postings older than 30 days aren't scored. On a first run, about 1,100 postings came down to roughly 300 before any AI call.
 3. **Score** what passes with Claude Haiku 5.5 against the mentor prompt's 1–10 rubric. The model judges each must-have requirement (met / partly / not, with the inventory fact as evidence), role signal, and stack match. Code does the arithmetic: requirements share → 0–4, strategic bonus from company facts, tiers, the "no sponsorship → Tier B" cap, and stale-posting flags.
-4. **Shortlist**: the daily target plus three spares, ranked by score, freshness, then Chicago/remote, with at most two per company in 30 days. You accept or dismiss each one; nothing is applied to automatically.
+4. **Today's deck**: 5 Tier A and 5 Tier B jobs (set in Settings), Tier A first, ranked by score (+1 for Chicago within a tier), freshness, then remote, with at most two per company in 30 days. One card at a time: swipe right (or →) to accept, left (or ←) to skip, with Undo for a skip. Each decision tops the deck back up from the next-ranked jobs, so **Check for new postings** (the old Run now) is only for new postings. Nothing is applied to automatically.
 
 Every AI call is logged with its token counts and cost. The mentor prompt and inventory are prompt-cached, so a scored job costs about $0.001.
 
@@ -41,7 +41,9 @@ Every AI call is logged with its token counts and cost. The mentor prompt and in
 **Accept and prepare** on a job builds the application:
 
 - **Tier A:** Claude Sonnet 5.5 tailors the matching base resume (FDE or SWE). It may only reword existing lines (by line id) and reorder bullets within a role: no new roles, projects or claims. It also writes a recruiter note under 100 words and answers to common questions.
-- **Tier B:** the base resume as-is, plus your standard answers. No AI call.
+- **Tier B:** the base resume as-is, plus your standard answers, and a short recruiter note (one small Sonnet call).
+- **Accept returns right away.** Preparation runs in the background; the application appears in Review (under Needs fixes if the Truth Check flags something). A base resume with Truth Check problems has to be fixed on the Resumes page first.
+- **Fix where it's flagged:** every Truth Check problem in Review has its own edit box (resume line, contact line, answer or note). "Write it again" redrafts the note; "Rebuild from base resume" restarts an application after you fix the base.
 - **Work-authorization answers** always come from Settings and can't be edited per application.
 
 Then the **Truth Check** runs in code over every resume line, the note and every answer:

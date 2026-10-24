@@ -99,7 +99,8 @@ export const settingsBody = z.object({
   }),
   standardAnswers: z.array(z.object({ question: z.string().trim().min(1), answer: z.string().trim() })).max(30),
   shortlist: z.object({
-    minFitScore: z.number().int().min(1).max(10),
+    tierAPicks: z.number().int().min(0).max(20),
+    tierBPicks: z.number().int().min(0).max(20),
     maxAgeDays: z.number().int().min(1).max(90),
     preferredCityBoost: z.number().int().min(0).max(2),
   }),

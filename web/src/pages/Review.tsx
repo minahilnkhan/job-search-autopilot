@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
-import type { ApplicationDetail, ApplicationSummary } from "../../../shared/types";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { ApplicationDetail, ApplicationSummary, TruthIssue } from "../../../shared/types";
 import { api } from "../lib/api";
 import { addDays, editableLines } from "../lib/resumeLines";
 import { TruthPanel } from "../components/TruthPanel";
 import { ScoreBadge, ScoreBreakdownView } from "../components/Score";
+import { PreparingTray, type Preparing } from "../components/PreparingTray";
 
 type View = "review" | "blocked" | "snoozed" | "approved";
 const VIEWS: { id: View; label: string }[] = [
@@ -15,7 +16,7 @@ const VIEWS: { id: View; label: string }[] = [
 
 const words = (s: string) => s.trim().split(/\s+/).filter(Boolean).length;
 
-function Detail({ id, onChanged }: { id: number; onChanged: () => void }) {
+function Detail({ id, onChanged, onOpen }: { id: number; onChanged: () => void; onOpen: (id: number) => void }) {
   const [app, setApp] = useState<ApplicationDetail | null>(null);
   const [note, setNote] = useState("");
   const [answers, setAnswers] = useState<string[]>([]);
@@ -66,6 +67,53 @@ function Detail({ id, onChanged }: { id: number; onChanged: () => void }) {
   const canApprove = app.status === "ready_for_review" && app.hasPdf && app.pdfPages === 1 && !dirty;
   const pdfUrl = `/api/applications/${app.id}/resume.pdf?v=${app.truth.checkedAt}`;
 
+  // An edit box under each Truth Check problem, bound to the same drafts as
+  // the sections below, so you fix it where it's flagged.
+  function fixFor(issue: TruthIssue) {
+    if (!editable) return null;
+    const line = issue.lineId ? lines.find((l) => l.id === issue.lineId) : undefined;
+    if (line) {
+      return (
+        <div className="space-y-1 pt-1">
+          <textarea aria-label={`Fix ${issue.where}`} rows={line.id === "contact" ? 1 : 2} className="field font-serif"
+            value={lineEdits[line.id] ?? line.text} onChange={(e) => setLineEdits((m) => ({ ...m, [line.id]: e.target.value }))} />
+          {issue.kind === "placeholder" && (
+            <p className="text-sm text-ink-soft">
+              This came from your base resume. Fix it on the <a className="text-accent underline underline-offset-2" href="#/resumes">Resumes page</a> too, so the next application doesn't have it.
+            </p>
+          )}
+        </div>
+      );
+    }
+    if (issue.where === "Recruiter note") {
+      return <textarea aria-label="Fix recruiter note" rows={4} className="field font-serif" value={note} onChange={(e) => setNote(e.target.value)} />;
+    }
+    if (issue.where.startsWith("Answer › ")) {
+      const q = issue.where.slice("Answer › ".length);
+      const i = app!.answers.findIndex((a) => a.question === q && a.source !== "fixed");
+      if (i === -1) return null;
+      return (
+        <div className="space-y-1 pt-1">
+          <textarea aria-label={`Fix answer: ${q}`} rows={2} className="field" value={answers[i] ?? ""}
+            onChange={(e) => setAnswers((xs) => xs.map((x, j) => (j === i ? e.target.value : x)))} />
+          {app!.answers[i]!.source === "standard" && (
+            <p className="text-sm text-ink-soft">
+              This is one of your standard answers. Set it once in <a className="text-accent underline underline-offset-2" href="#/settings">Settings</a> and
+              every new application gets it.
+            </p>
+          )}
+        </div>
+      );
+    }
+    if (issue.kind === "render") return null;
+    // Company, title and date lines aren't editable per application.
+    return (
+      <p className="text-sm text-ink-soft">
+        Change this line on the <a className="text-accent underline underline-offset-2" href="#/resumes">Resumes page</a>, then press Rebuild from base resume.
+      </p>
+    );
+  }
+
   async function save() {
     await act("save", () =>
       api.editApplication(app!.id, {
@@ -110,16 +158,26 @@ function Detail({ id, onChanged }: { id: number; onChanged: () => void }) {
       </header>
 
       <section className="panel p-5">
-        <TruthPanel report={app.truth} override={app.truthOverride} />
+        <TruthPanel report={app.truth} override={app.truthOverride} fix={fixFor} />
+        {editable && dirty && !app.truth.pass && (
+          <button className="btn-primary mt-4" disabled={!!busy} onClick={save}>{busy === "save" ? "Checking…" : "Save and re-check"}</button>
+        )}
         {editable && !app.truth.pass && !app.truthOverride && !renderBlocked && (
-          <div className="mt-4 space-y-2 border-t border-line pt-4">
-            <label className="label" htmlFor="override">Every flagged line is actually true? Override with the reason (kept on record):</label>
-            <textarea id="override" className="field" rows={2} value={overrideReason} onChange={(e) => setOverrideReason(e.target.value)}
-              placeholder="e.g. The 12 teams number is from my manager's email; adding it to my inventory." />
-            <button className="btn-quiet" disabled={!!busy} onClick={() => act("override", () => api.override(app.id, overrideReason))}>
-              Override and send to review
-            </button>
-          </div>
+          <details className="mt-4 border-t border-line pt-4">
+            <summary className="cursor-pointer text-[15px] font-medium text-ink-soft">A flagged line is true, but the check doesn't know it</summary>
+            <div className="mt-3 space-y-2">
+              <p className="text-[15px]">
+                The Truth Check is code: it only passes numbers and claims it can find in your candidate inventory. If a flagged line is true
+                and just missing from the inventory, you can let this application through by saying why. The reason is kept on record.
+                Usually the better fix is to edit the line above, or add the fact to your inventory.
+              </p>
+              <textarea id="override" aria-label="Why the flagged lines are true" className="field" rows={2} value={overrideReason}
+                onChange={(e) => setOverrideReason(e.target.value)} placeholder="e.g. The 12 teams number is from my manager's email." />
+              <button className="btn-quiet" disabled={!!busy || overrideReason.trim().length < 10} onClick={() => act("override", () => api.override(app.id, overrideReason))}>
+                Let it through
+              </button>
+            </div>
+          </details>
         )}
       </section>
 
@@ -129,7 +187,26 @@ function Detail({ id, onChanged }: { id: number; onChanged: () => void }) {
           <div className="flex flex-wrap gap-2">
             {app.hasPdf && <a className="btn-quiet py-1.5" href={pdfUrl} target="_blank" rel="noreferrer">Open PDF</a>}
             {app.hasDocx && <a className="btn-quiet py-1.5" href={`/api/applications/${app.id}/resume.docx`}>Download DOCX</a>}
-            {editable && <button className="btn-quiet py-1.5" disabled={!!busy} onClick={() => act("regen", () => api.regenerate(app.id))}>{busy === "regen" ? "Regenerating…" : "Regenerate"}</button>}
+            {editable && <button className="btn-quiet py-1.5" disabled={!!busy} title="Re-make the PDF and DOCX from the text below" onClick={() => act("regen", () => api.regenerate(app.id))}>{busy === "regen" ? "Making files…" : "Remake PDF"}</button>}
+            {editable && (
+              <button className="btn-quiet py-1.5" disabled={!!busy} title="Start this application again from your current base resume (after you've fixed it on the Resumes page)"
+                onClick={async () => {
+                  setBusy("restart");
+                  setError(null);
+                  try {
+                    const fresh = await api.restart(app.id);
+                    onChanged();
+                    location.hash = `#/review?id=${fresh.id}`;
+                    onOpen(fresh.id);
+                  } catch (e) {
+                    setError((e as Error).message);
+                  } finally {
+                    setBusy(null);
+                  }
+                }}>
+                {busy === "restart" ? (app.tier === "A" ? "Re-tailoring…" : "Rebuilding…") : "Rebuild from base resume"}
+              </button>
+            )}
           </div>
         </div>
 
@@ -184,13 +261,20 @@ function Detail({ id, onChanged }: { id: number; onChanged: () => void }) {
         )}
       </section>
 
-      {(app.tier === "A" || app.recruiterNote) && (
-        <section className="panel space-y-2 p-5">
+      <section className="panel space-y-2 p-5">
+        <div className="flex flex-wrap items-center justify-between gap-2">
           <h3 className="text-lg font-semibold">Recruiter note</h3>
-          <textarea className="field font-serif" rows={5} value={note} disabled={!editable} onChange={(e) => setNote(e.target.value)} />
-          <p className={`text-sm ${words(note) >= 100 ? "text-fail" : "text-ink-soft"}`}>{words(note)} of 99 words</p>
-        </section>
-      )}
+          {editable && (
+            <button className="btn-quiet py-1.5" disabled={!!busy} onClick={() => act("note", () => api.redraftNote(app.id))}>
+              {busy === "note" ? "Writing…" : app.recruiterNote ? "Write it again" : "Write a note"}
+            </button>
+          )}
+        </div>
+        <p className="text-sm text-ink-soft">A draft from your inventory, for the application form or a LinkedIn message. Edit it freely.</p>
+        <textarea aria-label="Recruiter note" className="field font-serif" rows={5} value={note} disabled={!editable} onChange={(e) => setNote(e.target.value)}
+          placeholder={editable ? "No note yet. Press Write a note." : ""} />
+        <p className={`text-sm ${words(note) >= 100 ? "text-fail" : "text-ink-soft"}`}>{words(note)} of 99 words</p>
+      </section>
 
       <section className="panel space-y-4 p-5">
         <h3 className="text-lg font-semibold">Application answers</h3>
@@ -262,14 +346,37 @@ export function Review({ onCountsChanged }: { onCountsChanged: () => void }) {
     return m ? Number(m[1]) : null;
   });
 
+  const [preparing, setPreparing] = useState<Preparing[]>([]);
+
   const load = useCallback(async () => {
-    const entries = await Promise.all(VIEWS.map(async (v) => [v.id, await api.applications(v.id)] as const));
+    const [entries, prep] = await Promise.all([
+      Promise.all(VIEWS.map(async (v) => [v.id, await api.applications(v.id)] as const)),
+      api.preparing(),
+    ]);
     setLists(Object.fromEntries(entries) as Record<View, ApplicationSummary[]>);
+    setPreparing(prep);
     onCountsChanged();
   }, [onCountsChanged]);
   useEffect(() => {
     load();
   }, [load]);
+
+  // Open on whichever list has something in it, so a new application that
+  // needs fixes isn't hidden behind an empty "To review" tab.
+  const picked = useRef(false);
+  useEffect(() => {
+    if (picked.current || Object.values(lists).every((l) => l.length === 0)) return;
+    picked.current = true;
+    if (lists.review.length === 0 && lists.blocked.length > 0) setView("blocked");
+  }, [lists]);
+
+  // Accepted jobs land here as they finish preparing.
+  const inFlight = preparing.some((p) => !p.error);
+  useEffect(() => {
+    if (!inFlight) return;
+    const t = setInterval(() => load().catch(() => {}), 4000);
+    return () => clearInterval(t);
+  }, [inFlight, load]);
 
   const items = lists[view];
   return (
@@ -280,6 +387,8 @@ export function Review({ onCountsChanged }: { onCountsChanged: () => void }) {
           Every application waits here for your approval, one at a time. Nothing reaches the review list until it passes the Truth Check.
         </p>
       </header>
+
+      <PreparingTray items={preparing} onChanged={() => load().catch(() => {})} />
 
       <nav className="flex flex-wrap gap-1" aria-label="Review lists">
         {VIEWS.map((v) => (
@@ -313,7 +422,7 @@ export function Review({ onCountsChanged }: { onCountsChanged: () => void }) {
             </li>
           ))}
         </ul>
-        <div>{selected ? <Detail id={selected} onChanged={load} /> : <p className="text-ink-soft">Pick an application.</p>}</div>
+        <div>{selected ? <Detail id={selected} onChanged={load} onOpen={setSelected} /> : <p className="text-ink-soft">Pick an application.</p>}</div>
       </div>
     </section>
   );

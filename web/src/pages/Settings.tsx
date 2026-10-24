@@ -129,18 +129,13 @@ export function Settings() {
       <fieldset className="panel space-y-4 p-5">
         <legend className="px-1 text-lg font-semibold">Today's picks</legend>
         <p className="text-[15px] text-ink-soft">
-          Which scored jobs make the daily list. Changing these re-ranks today's picks right away, with no new AI calls.
+          How many jobs of each tier are in today's deck. Tier A comes first. Each time you accept or skip one, the next-best job of that tier takes its place, so you only need a new run for new postings. Changing these re-ranks the deck right away, with no new AI calls.
         </p>
         <div className="grid gap-4 sm:grid-cols-2">
-          <div>
-            <label className="label" htmlFor="minScore">Minimum fit score</label>
-            <select id="minScore" className="field" value={s.shortlist.minFitScore}
-              onChange={(e) => setS({ ...s, shortlist: { ...s.shortlist, minFitScore: Number(e.target.value) } })}>
-              {[5, 6, 7, 8, 9, 10].map((n) => (
-                <option key={n} value={n}>{n}/10{n === 5 ? " (all of Tier A and B)" : n === 8 ? " (Tier A only)" : ""}</option>
-              ))}
-            </select>
-          </div>
+          <NumberField label="Tier A picks (fit 8–10)" value={s.shortlist.tierAPicks}
+            onChange={(n) => setS({ ...s, shortlist: { ...s.shortlist, tierAPicks: n } })} />
+          <NumberField label="Tier B picks (fit 5–7)" value={s.shortlist.tierBPicks}
+            onChange={(n) => setS({ ...s, shortlist: { ...s.shortlist, tierBPicks: n } })} />
           <NumberField label="Posted within (days)" value={s.shortlist.maxAgeDays}
             onChange={(n) => setS({ ...s, shortlist: { ...s.shortlist, maxAgeDays: n } })} />
           <div className="sm:col-span-2">
@@ -148,13 +143,13 @@ export function Settings() {
             <select id="cityBoost" className="field sm:w-1/2" value={s.shortlist.preferredCityBoost}
               onChange={(e) => setS({ ...s, shortlist: { ...s.shortlist, preferredCityBoost: Number(e.target.value) } })}>
               <option value={0}>None: remote and city only break ties</option>
-              <option value={1}>+1: a 7 there ranks like an 8</option>
-              <option value={2}>+2: a 6 there ranks like an 8</option>
+              <option value={1}>+1: within a tier, a 7 there ranks like an 8 elsewhere</option>
+              <option value={2}>+2: within a tier, a 6 there ranks like an 8 elsewhere</option>
             </select>
           </div>
         </div>
         <p className="text-sm text-ink-soft">
-          A higher bar means fewer picks per day. If the list runs short, add more companies rather than lowering the bar.
+          If the deck runs short, there aren't enough recent jobs of that tier. Add more companies on the Companies page.
         </p>
       </fieldset>
 

@@ -136,3 +136,12 @@ Rejecting in review sets status `withdrawn` with your reason and dismisses the j
 
 ### Thinking budgets (fix after the first live runs)
 Claude 5.5 models think before answering, and thinking counts toward `max_tokens`. Haiku 5.5 scoring at `max_tokens: 2000` ran out of room on 18 long postings (`stop_reason: max_tokens`). Scoring is a structured judgment against a written rubric, so it now runs with `thinking: disabled`, `effort: low` and 3,000 tokens, which is cheaper and can't truncate. Tailoring (Sonnet 5.5) benefits from thinking, so it keeps it, at `effort: medium` with 16,000 tokens of room; you only pay for tokens used. Jobs that failed stay unscored and are retried on the next run.
+
+### After first use: a deck, not a list
+Picks were "fit 8+ and posted within 14 days", which left one job some days. Now a fixed number per tier (5 A + 5 B by default); the city boost reorders within a tier but never moves a job into the other tier's slots. Accept/skip remove the card and the server re-ranks from the remaining `new` jobs (no AI calls), so the deck refills without a run. Undo exists for skip only: accept starts paid work, and "Not applying" in Review covers changing your mind.
+
+### Citizenship is checked on the raw posting, with an EEO guard
+"US citizen or green card holder" slipped through because the old patterns only knew "US citizen" and the EEO boilerplate was stripped before matching. Patterns now cover permanent residency, "US persons" with ITAR/EAR, and "citizenship required", matched on the raw text, skipping a match whose sentence is equal-opportunity language ("without regard to citizenship"). Every stored job-board posting is re-checked on startup and before each run, unless you confirmed its fields by hand.
+
+### Accept runs in the background
+Tier A tailoring takes 20–40 seconds, and the deck shouldn't wait on it. The server marks the job accepted, returns 202, and prepares it in the background; failures show on Today and Review with Try again / Put back in the deck. The in-progress list lives in memory: a restart mid-preparation loses it, and the job can be put back from the Jobs page. Chromium is now launched once and reused, which was most of the PDF time.

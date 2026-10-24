@@ -29,6 +29,6 @@ describe.skipIf(!chromium)("real PDF + DOCX rendering", () => {
   it("explains how to fix a missing Chromium", async () => {
     const r = await makeRenderer({ chromiumPath: "/nope/chromium" })(parseResume(FIXTURE_RESUME), fs.mkdtempSync(path.join(os.tmpdir(), "render-")));
     expect(r.pdfPath).toBeNull();
-    expect(r.pdfError).toContain("npx playwright install chromium");
+    expect(r.pdfError).toContain("npm run setup:pdf");
   }, 30_000);
 });

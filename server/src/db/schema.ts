@@ -82,6 +82,9 @@ export const jobs = sqliteTable(
       .default([]),
     // Not in the original spec: the reviewed extraction (flags + evidence) the filters ran on.
     extractedFields: text("extracted_fields", { mode: "json" }).$type<ExtractedFields>().notNull(),
+    // True once a person has reviewed the fields (pasted jobs, or "Correct fields"):
+    // automatic re-extraction never overwrites them.
+    fieldsConfirmed: integer("fields_confirmed", { mode: "boolean" }).notNull().default(false),
     fitScore: integer("fit_score"),
     scoreBreakdown: text("score_breakdown", { mode: "json" }).$type<ScoreBreakdown>(),
     scoredAt: integer("scored_at", { mode: "timestamp_ms" }),
@@ -230,10 +233,12 @@ export const settings = sqliteTable("settings", {
     .$type<Settings["locationPrefs"]>()
     .notNull(),
   models: text("models", { mode: "json" }).$type<Settings["models"]>().notNull(),
+  // Column default kept as first shipped (changing it would rebuild the
+  // table); getSettings() fills in any newer keys from DEFAULT_SETTINGS.
   shortlist: text("shortlist", { mode: "json" })
     .$type<Settings["shortlist"]>()
     .notNull()
-    .default(DEFAULT_SETTINGS.shortlist),
+    .default(sql`'{"minFitScore":8,"maxAgeDays":14,"preferredCityBoost":1}'`),
   pipeline: text("pipeline", { mode: "json" })
     .$type<Settings["pipeline"]>()
     .notNull()

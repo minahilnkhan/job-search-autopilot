@@ -9,7 +9,9 @@ export function getSettings(db: DB): Settings {
   if (!row) return DEFAULT_SETTINGS;
   const { id: _id, ...rest } = row;
   // Fill keys added after the row was first saved (JSON columns don't migrate per key).
-  return { ...rest, shortlist: { ...DEFAULT_SETTINGS.shortlist, ...rest.shortlist } };
+  // Keep only known keys (an older row may still carry minFitScore).
+  const { tierAPicks, tierBPicks, maxAgeDays, preferredCityBoost } = { ...DEFAULT_SETTINGS.shortlist, ...rest.shortlist };
+  return { ...rest, shortlist: { tierAPicks, tierBPicks, maxAgeDays, preferredCityBoost } };
 }
 
 /** YYYY-MM-DD for `now` in an IANA timezone (en-CA formats dates that way). */

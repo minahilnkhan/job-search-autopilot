@@ -281,16 +281,36 @@ describe("progress and stopping", () => {
   });
 });
 
-describe("changing the picks thresholds", () => {
+describe("changing the picks settings", () => {
   it("re-ranks today's picks from existing scores without fetching or scoring", async () => {
     const { rebuildTodaysShortlist } = await import("../src/services/pipeline");
     const { settings } = await import("../src/db/schema");
-    await runPipeline(db, deps(), "schedule"); // scores 9, 9, 8, 8
+    await runPipeline(db, deps(), "schedule"); // four Tier A jobs (9, 9, 8, 8)
     expect(getShortlist(db)!.entries).toHaveLength(4);
     const row = db.select().from(settings).get()!;
-    db.update(settings).set({ shortlist: { ...row.shortlist, minFitScore: 9 } }).run();
-    // The two 9s, plus the Chicago 8 (boosted to 9).
-    expect(rebuildTodaysShortlist(db, NOW)).toBe(3);
-    expect(getShortlist(db)!.entries.map((e) => e.job.fitScore)).toEqual([9, 8, 9]);
+    db.update(settings).set({ shortlist: { ...row.shortlist, tierAPicks: 2 } }).run();
+    expect(rebuildTodaysShortlist(db, NOW)).toBe(2);
+  });
+});
+
+describe("re-checking stored jobs after a rule fix", () => {
+  it("catches a citizenship requirement the old rules missed; leaves confirmed fields and applied jobs alone", async () => {
+    const { recheckBoardJobs } = await import("../src/services/pipeline");
+    await runPipeline(db, deps(), "schedule");
+    const fde = db.select().from(jobs).where(eq(jobs.title, "Forward Deployed Engineer")).get()!;
+    const newGrad = db.select().from(jobs).where(eq(jobs.title, "Software Engineer, New Grad")).get()!;
+    const sol = db.select().from(jobs).where(eq(jobs.title, "Solutions Engineer")).get()!;
+    const citizen = "\nApplicants must be U.S. citizens or green card holders.";
+    for (const j of [fde, newGrad, sol]) db.update(jobs).set({ description: j.description + citizen }).where(eq(jobs.id, j.id)).run();
+    db.update(jobs).set({ fieldsConfirmed: true }).where(eq(jobs.id, newGrad.id)).run(); // you reviewed this one
+    db.insert(applications).values({ jobId: sol.id, status: "approved", approvedAt: NOW }).run(); // already applying
+
+    const r = recheckBoardJobs(db, NOW);
+    expect(r.nowFailing).toBe(1);
+    const after = (id: number) => db.select().from(jobs).where(eq(jobs.id, id)).get()!;
+    expect(after(fde.id).hardFilterPass).toBe(false);
+    expect(after(fde.id).filterFailReasons.map((x) => x.code)).toContain("citizenship");
+    expect(after(newGrad.id).hardFilterPass).toBe(true);
+    expect(after(sol.id).hardFilterPass).toBe(true);
   });
 });

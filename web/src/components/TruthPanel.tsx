@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import type { TruthIssue, TruthReport } from "../../../shared/types";
 
 const KIND_LABEL: Record<TruthIssue["kind"], string> = {
@@ -10,8 +11,15 @@ const KIND_LABEL: Record<TruthIssue["kind"], string> = {
   render: "PDF",
 };
 
-/** Truth Check results: every failing line, where it is, and why. */
-export function TruthPanel({ report, override }: { report: TruthReport; override?: { reason: string } | null }) {
+/**
+ * Truth Check results: every failing line, where it is, and why. `fix` lets
+ * the page put an edit box right under each problem.
+ */
+export function TruthPanel({ report, override, fix }: {
+  report: TruthReport;
+  override?: { reason: string } | null;
+  fix?: (issue: TruthIssue) => ReactNode;
+}) {
   const fails = report.issues.filter((i) => i.severity === "fail");
   const warns = report.issues.filter((i) => i.severity === "warn");
   return (
@@ -28,7 +36,7 @@ export function TruthPanel({ report, override }: { report: TruthReport; override
           {[...fails, ...warns].map((i, n) => (
             <li key={n} className="flex gap-3">
               <span aria-hidden className={`mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full ${i.severity === "fail" ? "bg-fail" : "bg-warn"}`} />
-              <div className="min-w-0 space-y-1">
+              <div className="min-w-0 flex-1 space-y-1">
                 <p className="text-sm text-ink-soft">
                   <span className={`font-semibold ${i.severity === "fail" ? "text-fail" : "text-warn"}`}>{KIND_LABEL[i.kind]}</span>
                   {" in "}
@@ -40,6 +48,7 @@ export function TruthPanel({ report, override }: { report: TruthReport; override
                   </p>
                 )}
                 <p className="text-[15px]">{i.message}</p>
+                {fix?.(i)}
               </div>
             </li>
           ))}

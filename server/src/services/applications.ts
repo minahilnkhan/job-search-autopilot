@@ -11,6 +11,7 @@ import { assertTransition } from "../domain/applicationStatus";
 import type { InventoryFacts } from "../domain/inventory";
 import type { Renderer } from "../render/renderer";
 import type { Tailor } from "../llm/tailor";
+import type { NoteWriter } from "../llm/note";
 import { ScoreError } from "../llm/scoreJob";
 import { accountProblem } from "../llm/errors";
 import { ConflictError, NotFoundError, getJob } from "./jobs";
@@ -28,6 +29,7 @@ import type {
 
 export type PrepDeps = {
   getTailor: (s: Settings) => { tailor: Tailor } | { unavailable: string };
+  getNoteWriter?: (s: Settings) => { writer: NoteWriter } | { unavailable: string };
   renderer: Renderer;
   facts: () => InventoryFacts;
   generatedDir?: string;
@@ -95,6 +97,58 @@ export async function finalizeApplication(db: DB, id: number, deps: PrepDeps, no
   db.update(applications).set({ truthReport: report, status, lastActivityAt: now }).where(eq(applications.id, id)).run();
 }
 
+async function draftNote(
+  db: DB,
+  args: { jobId: number; companyName: string; title: string; description: string; content: import("../../../shared/types").ResumeContent },
+  settings: Settings,
+  deps: PrepDeps,
+  now: Date
+): Promise<{ note: string } | { problem: string }> {
+  const w = deps.getNoteWriter?.(settings);
+  if (!w) return { problem: "note writing isn't set up" };
+  if ("unavailable" in w) return { problem: w.unavailable };
+  try {
+    const r = await w.writer({ companyName: args.companyName, title: args.title, description: args.description, resumeText: serializeResume(args.content) });
+    recordUsage(db, { purpose: "note", model: r.model, usage: r.usage, jobId: args.jobId, now });
+    return { note: r.note };
+  } catch (err) {
+    if (err instanceof ScoreError && err.usage) recordUsage(db, { purpose: "note", model: settings.models.tailoring, usage: err.usage, jobId: args.jobId, now });
+    return { problem: accountProblem(err) ?? (err as Error).message };
+  }
+}
+
+/** "Write it again": a fresh recruiter note, then the usual re-check. */
+export async function redraftNote(db: DB, id: number, deps: PrepDeps, now = new Date()) {
+  const app = loadEditable(db, id);
+  const detail = getApplication(db, id);
+  const n = await draftNote(
+    db,
+    { jobId: app.jobId, companyName: detail.companyName, title: detail.jobTitle, description: detail.job.description, content: detail.resume },
+    getSettings(db),
+    deps,
+    now
+  );
+  if ("problem" in n) throw new ConflictError(`Couldn't write a note: ${n.problem}`);
+  return editApplication(db, id, { recruiterNote: n.note }, deps, now);
+}
+
+/**
+ * Start this application over from the current base resume (e.g. after you
+ * fixed [email] there). The old one is closed, not deleted; Tier A is tailored
+ * again (a few cents).
+ */
+export async function restartApplication(db: DB, id: number, deps: PrepDeps, now = new Date()) {
+  const app = loadEditable(db, id);
+  db.update(applications).set({ status: "withdrawn", reviewReason: "Rebuilt from the updated base resume", lastActivityAt: now }).where(eq(applications.id, id)).run();
+  try {
+    return getApplication(db, await prepareApplication(db, app.jobId, deps, now));
+  } catch (err) {
+    // Put the old one back if the rebuild couldn't start (e.g. base still has problems).
+    db.update(applications).set({ status: app.status, reviewReason: null }).where(eq(applications.id, id)).run();
+    throw err;
+  }
+}
+
 /** Accept → prepare. Idempotent: an open application for the job is returned as-is. */
 export async function prepareApplication(db: DB, jobId: number, deps: PrepDeps, now = new Date()): Promise<number> {
   const job = getJob(db, jobId);
@@ -109,6 +163,13 @@ export async function prepareApplication(db: DB, jobId: number, deps: PrepDeps, 
   const baseType = chooseBase(job.title);
   const base = getBaseRow(db, baseType);
   if (!base) throw new ConflictError(`Add your ${baseType.toUpperCase()} base resume on the Resumes page first.`);
+  // Fix shared problems (like [email]) once in the base, not in every application.
+  const baseFails = base.truthReport?.issues.filter((i) => i.severity === "fail") ?? [];
+  if (baseFails.length) {
+    throw new ConflictError(
+      `Your ${baseType.toUpperCase()} base resume has ${baseFails.length} ${baseFails.length === 1 ? "problem" : "problems"} to fix first on the Resumes page (for example: ${baseFails[0]!.message}). Every application starts from it.`
+    );
+  }
 
   const settings = getSettings(db);
   const tier = job.tier === "A" ? "A" : "B";
@@ -147,6 +208,14 @@ export async function prepareApplication(db: DB, jobId: number, deps: PrepDeps, 
         notes.push(`Tailoring failed (${fatal ?? (err as Error).message}); using the base resume. You can edit lines below.`);
       }
     }
+  }
+
+  // Every application gets a recruiter note you can edit. Tier A's comes from
+  // tailoring; otherwise a short separate call writes one.
+  if (!recruiterNote) {
+    const n = await draftNote(db, { jobId, companyName: job.companyName, title: job.title, description: job.description, content }, settings, deps, now);
+    if ("note" in n) recruiterNote = n.note;
+    else notes.push(`No recruiter note yet (${n.problem}). Use "Write a note" below.`);
   }
 
   const answers: Answer[] = [
@@ -263,6 +332,7 @@ function loadEditable(db: DB, id: number) {
 
 export type ApplicationPatch = {
   recruiterNote?: string | null;
+  contact?: string;
   answers?: { index: number; answer: string }[];
   lines?: { id: string; text: string }[];
 };
@@ -270,11 +340,13 @@ export type ApplicationPatch = {
 /** Any edit clears a Truth Check override: you approved the old text, not this one. */
 export async function editApplication(db: DB, id: number, patch: ApplicationPatch, deps: PrepDeps, now = new Date()) {
   const app = loadEditable(db, id);
+  if (patch.contact !== undefined) patch = { ...patch, lines: [...(patch.lines ?? []), { id: "contact", text: patch.contact }] };
   if (patch.lines?.length) {
     const version = db.select().from(resumeVersions).where(eq(resumeVersions.id, app.resumeVersionId!)).get()!;
     let content = version.content;
     const changes = [...(version.diffFromBase ?? [])];
     const current = new Map(resumeLines(content).map((l) => [l.id, l]));
+    current.set("contact", { id: "contact", where: "Contact line", text: content.contact, kind: "line" });
     for (const { id: lineId, text } of patch.lines) {
       const before = current.get(lineId);
       if (!before || before.text === text.trim()) continue;

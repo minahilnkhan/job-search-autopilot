@@ -29,7 +29,7 @@ export type PipelineDeps = {
 
 type CompanyRow = typeof companies.$inferSelect;
 
-const SCORING_CONCURRENCY = 4;
+const SCORING_CONCURRENCY = 6; // Haiku without thinking is quick; 6 in flight stays well under rate limits
 
 // ---- 1. Fetch and store ---------------------------------------------------------
 
@@ -172,18 +172,21 @@ export async function scoreJob(db: DB, jobId: number, scorer: Scorer, now: Date)
 export const MAX_SCORE_AGE_DAYS = 30;
 
 /**
- * Re-check unscored job-board postings against the current rules, so a rule
- * change (like a tighter role screen) applies to the backlog before anything
- * is paid for. Pure code, no API calls.
+ * Re-check job-board postings against the current extraction and filter
+ * rules, so a fix (like catching "US citizen or green card holder") applies to
+ * jobs already in the database. Fields a person confirmed are left alone, and
+ * jobs you've started an application for aren't touched. Pure code, no API calls.
  */
-export function refilterUnscored(db: DB, now: Date): number {
-  const ids = db
-    .select({ id: jobs.id })
-    .from(jobs)
-    .where(and(isNull(jobs.scoredAt), ne(jobs.source, "manual")))
-    .all();
-  for (const { id } of ids) updateJob(db, id, {}, now);
-  return ids.length;
+export function recheckBoardJobs(db: DB, now: Date): { checked: number; nowFailing: number } {
+  const applied = new Set(db.select({ jobId: applications.jobId }).from(applications).all().map((r) => r.jobId));
+  const rows = db.select().from(jobs).where(ne(jobs.source, "manual")).all().filter((j) => !applied.has(j.id));
+  let nowFailing = 0;
+  for (const j of rows) {
+    const fields = j.fieldsConfirmed ? undefined : extractFields({ title: j.title, location: j.location, description: j.description });
+    const updated = updateJob(db, j.id, fields ? { fields } : {}, now, { confirm: false });
+    if (j.hardFilterPass && !updated.hardFilterPass) nowFailing++;
+  }
+  return { checked: rows.length, nowFailing };
 }
 
 /** Unscored, recent jobs that passed the filters, newest postings first, up to the per-run cap. */
@@ -285,13 +288,14 @@ export function buildShortlist(db: DB, settings: Settings, now: Date): number[] 
     };
   });
 
-  // Daily target plus a few spares, so you can drop some (mentor prompt: 12–13).
-  const size = settings.targets.appsPerDay + 3;
+  // Today's deck: the best Tier A and Tier B jobs, a set number of each
+  // (Settings → Today's picks). Skipping or accepting one tops the deck back
+  // up from the next-ranked jobs, without fetching or scoring again.
   return rankShortlist(candidates, {
-    size,
+    size: settings.shortlist.tierAPicks + settings.shortlist.tierBPicks,
+    perTier: { A: settings.shortlist.tierAPicks, B: settings.shortlist.tierBPicks },
     preferredLocations: settings.locationPrefs.preferred,
     now,
-    minFitScore: settings.shortlist.minFitScore,
     maxAgeDays: settings.shortlist.maxAgeDays,
     preferredCityBoost: settings.shortlist.preferredCityBoost,
   });
@@ -352,7 +356,7 @@ export async function runPipeline(db: DB, deps: PipelineDeps, trigger: PipelineR
 
   try {
     Object.assign(stats, await fetchAll(db, deps, now));
-    refilterUnscored(db, now);
+    recheckBoardJobs(db, now);
     if (stats.companiesFailed) notes.push(`${stats.companiesFailed} job board(s) failed; see Companies.`);
 
     const s = deps.getScorer(settings);

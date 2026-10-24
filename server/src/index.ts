@@ -2,14 +2,14 @@ import { buildApp } from "./app";
 import { createDb, runMigrations } from "./db/client";
 import { seed } from "./db/seed";
 import { config } from "./config";
-import { anthropicScorerFactory, anthropicTailorFactory } from "./llm/factory";
+import { anthropicNoteFactory, anthropicScorerFactory, anthropicTailorFactory } from "./llm/factory";
 import { makeRenderer } from "./render/renderer";
 import { loadTruthFacts } from "./services/truth";
 import { importBasesIfMissing } from "./services/resumes";
 import type { PrepDeps } from "./services/applications";
 import { fetchBoard } from "./sources/boards";
 import { startScheduler } from "./scheduler";
-import { markInterruptedRuns, type PipelineDeps } from "./services/pipeline";
+import { markInterruptedRuns, rebuildTodaysShortlist, recheckBoardJobs, type PipelineDeps } from "./services/pipeline";
 
 const db = createDb();
 // Migrate + seed on boot so a fresh clone works with just `npm run dev`.
@@ -17,10 +17,17 @@ const db = createDb();
 runMigrations(db);
 seed(db);
 markInterruptedRuns(db); // a run can't still be going if the app just started
+// Apply the current filter rules to jobs already stored (free, no API calls),
+// then re-rank today's picks so a job that now fails drops off right away.
+{
+  const r = recheckBoardJobs(db, new Date());
+  if (r.nowFailing) rebuildTodaysShortlist(db);
+  console.log(`Re-checked ${r.checked} job-board postings; ${r.nowFailing} now fail a hard filter.`);
+}
 
 const pipeline: PipelineDeps = { fetchBoard, getScorer: anthropicScorerFactory };
 let reschedule = () => {};
-const prep: PrepDeps = { getTailor: anthropicTailorFactory, renderer: makeRenderer({ chromiumPath: config.chromiumPath }), facts: loadTruthFacts };
+const prep: PrepDeps = { getTailor: anthropicTailorFactory, getNoteWriter: anthropicNoteFactory, renderer: makeRenderer({ chromiumPath: config.chromiumPath }), facts: loadTruthFacts };
 const app = buildApp(db, { logger: true, pipeline, prep, onSettingsChanged: () => reschedule() });
 
 // Bind to localhost only: this is a personal tool with no auth.

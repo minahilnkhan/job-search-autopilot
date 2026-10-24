@@ -142,16 +142,55 @@ const CLEARANCE = [
   /\b(?:obtain|maintain|hold)\s+(?:a|an)\s+(?:active\s+)?(?:government|federal)?\s*clearance\b/i,
 ];
 
+// "U.S." / "US" / "USA" / "United States" / "American", and the ways postings
+// say "permanent resident".
+const US = String.raw`(?:u\.?\s?s\.?(?:a\.?)?|united\s+states|american)`;
+const PR = String.raw`(?:(?:lawful\s+)?permanent\s+residen(?:ts?|cy)|green[\s-]?cards?(?:\s+holders?)?|LPRs?)`;
+const OR = String.raw`(?:or|and\/or|\/)`;
+const rx = (src: string, flags = "i") => new RegExp(src, flags);
+
+// Any of these means you can't take the job on OPT, so it's a hard fail.
 const CITIZENSHIP = [
-  /\bmust\s+be\s+(?:a\s+)?(?:u\.?s\.?|united states)\s+citizen\b/i,
-  /\b(?:u\.?s\.?|united states)\s+citizen(?:ship)?\s+(?:is\s+)?(?:required|only)\b/i,
-  /\b(?:u\.?s\.?|united states)\s+citizens\s+only\b/i,
-  /\brequires?\s+(?:u\.?s\.?|united states)\s+citizenship\b/i,
-  /\bmust\s+be\s+(?:a\s+)?(?:u\.?s\.?|united states)\s+persons?\b/i,
-  /\b(?:u\.?s\.?|united states)\s+persons?\b[^.]{0,80}\b(?:ITAR|EAR|export)\b/i,
+  // "U.S. citizens or green card holders", "US citizen/permanent resident"
+  rx(String.raw`\b${US}\s+citizens?(?:hip)?\b[^.;\n]{0,40}?\b${OR}\s*(?:an?\s+)?${PR}`),
+  // "Green card holders or U.S. citizens"
+  rx(String.raw`\b${PR}\b[^.;\n]{0,40}?\b${OR}\s*(?:an?\s+)?${US}\s+citizens?`),
+  // "Must be a U.S. citizen", "must hold a green card", "must be a US person"
+  rx(String.raw`\bmust\s+(?:be|hold|have|possess)\s+(?:an?\s+)?(?:${US}\s+(?:citizen|citizenship|person)|${PR})`),
+  rx(String.raw`\b${US}\s+citizen(?:ship)?\s+(?:is\s+)?(?:required|only|mandatory)\b`),
+  rx(String.raw`\b${US}\s+citizens\s+only\b`),
+  // "This position requires U.S. citizenship / permanent residency"
+  rx(String.raw`\b(?:requires?|required|requirement)\b[^.;\n]{0,40}?\b(?:${US}\s+citizenship|${US}\s+citizen|${PR})`),
+  rx(String.raw`\bonly\s+(?:open\s+to\s+|considering\s+)?(?:${US}\s+citizens|${PR})`),
+  rx(String.raw`\b(?:${US}\s+)?citizenship\s+(?:is\s+)?(?:required|mandatory)\b`),
+  rx(String.raw`\b${US}\s+persons?\b[^.]{0,80}\b(?:ITAR|EAR|export)\b`),
   /\bITAR\b/, // case-sensitive on purpose: "itar" inside words never matches
   /\bexport[- ]control(?:led)?\b[^.]{0,80}\b(?:citizen|u\.?s\.? person)/i,
 ];
+
+// EEO language uses the same words in the opposite sense ("without regard to
+// … citizenship status"). A match preceded by this in the same sentence is ignored.
+const EEO_CONTEXT = /without regard to|regardless of|discriminat|protected (?:veteran|class|characteristic)|on the basis of/i;
+
+/**
+ * Like findFirst, but over the raw text and skipping EEO phrasing. Used for
+ * citizenship and clearance: a real requirement written in the same paragraph
+ * as the EEO statement is still caught.
+ */
+function findRequirement(raw: string, patterns: RegExp[]): string | null {
+  for (const p of patterns) {
+    const global = new RegExp(p.source, p.flags.includes("g") ? p.flags : `${p.flags}g`);
+    for (const m of raw.matchAll(global)) {
+      const idx = m.index ?? 0;
+      // Look back up to 120 characters on the same line ("." isn't a safe
+      // sentence break here: "U.S." is full of them).
+      const from = Math.max(raw.lastIndexOf("\n", idx), idx - 120, 0);
+      if (EEO_CONTEXT.test(raw.slice(from, idx))) continue;
+      return snippet(raw, idx, m[0].length);
+    }
+  }
+  return null;
+}
 
 // ---- Main ------------------------------------------------------------------
 
@@ -190,9 +229,9 @@ export function extractFields(input: {
   const eVerify = findFirst(raw, [/\bparticipates in e-?verify\b|\be-?verify (?:employer|participant|participation)\b/i]);
   if (eVerify) evidence.eVerifyMentioned = eVerify;
 
-  const clearance = findFirst(text, CLEARANCE);
+  const clearance = findRequirement(raw, CLEARANCE);
   if (clearance) evidence.requiresClearance = clearance;
-  const citizenship = findFirst(text, CITIZENSHIP);
+  const citizenship = findRequirement(raw, CITIZENSHIP);
   if (citizenship) evidence.requiresCitizenship = citizenship;
 
   return {

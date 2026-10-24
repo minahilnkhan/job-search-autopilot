@@ -101,9 +101,13 @@ export function resumeLines(r: ResumeContent): ResumeLine[] {
   return out;
 }
 
-/** Replace one bullet or section line by id. Headers aren't editable this way. */
+/** Replace one bullet, section line, or the contact line ("contact") by id. Entry headers aren't editable this way. */
 export function setLine(r: ResumeContent, id: string, text: string): ResumeContent {
   const copy: ResumeContent = structuredClone(r);
+  if (id === "contact") {
+    copy.contact = text;
+    return copy;
+  }
   const m = /^(\d+)\.(?:L(\d+)|(\d+)\.(\d+))$/.exec(id);
   if (!m) throw new ResumeFormatError(`Unknown line id "${id}"`);
   const section = copy.sections[Number(m[1])];

@@ -11,14 +11,17 @@ import {
   listApplications,
   overrideTruthCheck,
   prepareApplication,
+  redraftNote,
   rejectApplication,
+  restartApplication,
   snoozeApplication,
   unapproveApplication,
   type PrepDeps,
 } from "../services/applications";
 import { getBase, saveBase } from "../services/resumes";
 import { ResumeFormatError } from "../domain/resumeFormat";
-import { ConflictError, NotFoundError } from "../services/jobs";
+import { ConflictError, NotFoundError, getJob } from "../services/jobs";
+import { jobs } from "../db/schema";
 import { idParam } from "./validation";
 import { resumeVersions } from "../db/schema";
 import { eq } from "drizzle-orm";
@@ -61,13 +64,44 @@ export function applicationRoutes(app: FastifyInstance, db: DB, deps: PrepDeps) 
   });
 
   // ---- Applications
-  // Accept → prepare. Tier A calls the tailoring model, so this can take ~20–40s.
+  // Preparing runs in the background so Accept returns at once (Tier A
+  // tailoring takes ~20–40s). The Review page lists what's in progress.
+  type Preparing = { jobId: number; jobTitle: string; companyName: string; startedAt: number; error: string | null };
+  const preparing = new Map<number, Preparing>();
+
   app.post("/api/applications", async (req, reply) => {
-    const { jobId } = z.object({ jobId: z.number().int().positive() }).parse(req.body);
-    const id = await prepareApplication(db, jobId, deps);
-    reply.code(201);
-    return getApplication(db, id);
+    const { jobId, background } = z.object({ jobId: z.number().int().positive(), background: z.boolean().optional() }).parse(req.body);
+    if (!background) {
+      const id = await prepareApplication(db, jobId, deps);
+      reply.code(201);
+      return getApplication(db, id);
+    }
+    const job = getJob(db, jobId);
+    if (!job.hardFilterPass) throw new ConflictError("This job fails a hard filter. Correct its fields first.");
+    if (preparing.get(jobId)?.error === null) return reply.code(202).send({ jobId, preparing: true });
+    db.update(jobs).set({ status: "shortlisted" }).where(eq(jobs.id, jobId)).run(); // leaves the deck right away
+    const entry: Preparing = { jobId, jobTitle: job.title, companyName: job.companyName, startedAt: Date.now(), error: null };
+    preparing.set(jobId, entry);
+    void prepareApplication(db, jobId, deps)
+      .then(() => preparing.delete(jobId))
+      .catch((err) => {
+        entry.error = (err as Error).message;
+      });
+    return reply.code(202).send({ jobId, preparing: true });
   });
+
+  app.get("/api/applications/preparing", async () => [...preparing.values()]);
+
+  // Dismiss a failed preparation (the job goes back to the deck).
+  app.delete("/api/applications/preparing/:id", async (req) => {
+    const { id } = idParam.parse(req.params);
+    preparing.delete(id);
+    db.update(jobs).set({ status: "new" }).where(eq(jobs.id, id)).run();
+    return { ok: true };
+  });
+
+  app.post("/api/applications/:id/note", async (req) => redraftNote(db, idParam.parse(req.params).id, deps));
+  app.post("/api/applications/:id/restart", async (req) => restartApplication(db, idParam.parse(req.params).id, deps));
 
   app.get("/api/applications", async (req) => {
     const { view } = z.object({ view: z.enum(["review", "blocked", "snoozed", "approved", "closed"]).default("review") }).parse(req.query);
@@ -81,6 +115,7 @@ export function applicationRoutes(app: FastifyInstance, db: DB, deps: PrepDeps) 
     const body = z
       .object({
         recruiterNote: z.string().nullable().optional(),
+        contact: z.string().min(1).optional(),
         answers: z.array(z.object({ index: z.number().int().min(0), answer: z.string() })).optional(),
         lines: z.array(z.object({ id: z.string(), text: z.string().min(1) })).optional(),
       })

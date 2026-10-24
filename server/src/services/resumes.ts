@@ -16,7 +16,7 @@ export type ResumeDeps = { renderer: Renderer; facts: () => InventoryFacts; gene
 export function resumeCheckLines(r: ResumeContent): CheckLine[] {
   return [
     // Contact line: only placeholders matter (no number check on phone numbers).
-    { where: "Resume › Contact line", text: r.contact, checkNumbers: false },
+    { where: "Resume › Contact line", text: r.contact, checkNumbers: false, lineId: "contact" },
     ...resumeLines(r).map((l) => ({ where: `Resume › ${l.where}`, text: l.text, lineId: l.kind === "header" ? undefined : l.id })),
   ];
 }

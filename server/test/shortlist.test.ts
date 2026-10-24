@@ -104,3 +104,24 @@ describe("preferred-city (Chicago) boost", () => {
     expect(rankShortlist([chi7], { ...opts, preferredCityBoost: 0 })).toEqual([]);
   });
 });
+
+describe("per-tier picks (Today's deck)", () => {
+  const opts = { size: 10, preferredLocations: ["Chicago, IL"], now: NOW, perTier: { A: 5, B: 5 }, preferredCityBoost: 1 };
+  it("takes up to 5 of each tier, Tier A first", () => {
+    const as = Array.from({ length: 7 }, (_, i) => c({ fitScore: 8 + (i % 3 === 0 ? 1 : 0), tier: "A", companyId: 200 + i }));
+    const bs = Array.from({ length: 7 }, (_, i) => c({ fitScore: 5 + (i % 3), tier: "B", companyId: 300 + i }));
+    const picked = rankShortlist([...bs, ...as], opts);
+    expect(picked).toHaveLength(10);
+    expect(picked.slice(0, 5).every((id) => as.some((a) => a.jobId === id))).toBe(true);
+    expect(picked.slice(5).every((id) => bs.some((b) => b.jobId === id))).toBe(true);
+  });
+  it("a boosted Chicago 7 stays a Tier B pick (the boost only reorders)", () => {
+    const chi7 = c({ fitScore: 7, tier: "B", location: "Chicago, IL", companyId: 1 });
+    const b6 = c({ fitScore: 7, tier: "B", location: "Austin, TX", companyId: 2 });
+    const picked = rankShortlist([b6, chi7], { ...opts, perTier: { A: 5, B: 1 } });
+    expect(picked).toEqual([chi7.jobId]);
+  });
+  it("shows fewer when there aren't enough", () => {
+    expect(rankShortlist([c({ fitScore: 9, tier: "A", companyId: 9 })], opts)).toHaveLength(1);
+  });
+});

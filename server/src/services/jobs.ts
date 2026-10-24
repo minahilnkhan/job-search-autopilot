@@ -147,6 +147,7 @@ export function createJob(db: DB, req: CreateJobRequest, now = new Date()): Crea
       hardFilterPass: result.pass,
       filterFailReasons: result.reasons,
       extractedFields: fields,
+      fieldsConfirmed: true, // you reviewed them on the Add a job page
       dedupeKey: key,
     })
     .returning()
@@ -164,7 +165,7 @@ export type JobPatch = {
 };
 
 /** Edit a job's fields and re-run the filters on the new values. */
-export function updateJob(db: DB, id: number, patch: JobPatch, now = new Date()): Job {
+export function updateJob(db: DB, id: number, patch: JobPatch, now = new Date(), opts: { confirm?: boolean } = {}): Job {
   const current = db.select().from(jobs).where(eq(jobs.id, id)).get();
   if (!current) throw new NotFoundError(`Job ${id} not found`);
   const company = db.select().from(companies).where(eq(companies.id, current.companyId)).get()!;
@@ -189,6 +190,8 @@ export function updateJob(db: DB, id: number, patch: JobPatch, now = new Date())
       yearsRequired: fields.yearsRequired,
       sponsorshipStated: fields.sponsorshipStated,
       extractedFields: fields,
+      // Edits from the UI mark fields as confirmed; automatic re-extraction doesn't.
+      fieldsConfirmed: patch.fields && opts.confirm !== false ? true : current.fieldsConfirmed,
       hardFilterPass: result.pass,
       filterFailReasons: result.reasons,
       dedupeKey: key,

@@ -43,6 +43,12 @@ export function rankShortlist(
      * (and its tier) is unchanged; this only affects Today's picks.
      */
     preferredCityBoost?: number;
+    /**
+     * Picks per tier, e.g. { A: 5, B: 5 }. A job fills a slot of its real
+     * tier; the city boost only changes order within a tier. When set, `size`
+     * is the sum of the two.
+     */
+    perTier?: { A: number; B: number };
   }
 ): number[] {
   const boost = opts.preferredCityBoost ?? 0;
@@ -86,14 +92,20 @@ export function rankShortlist(
   // Respect "max 2 applications per company per 30 days": a company that
   // already has 1 recent application gets at most 1 slot today.
   const taken = new Map<number, number>();
-  const picked: number[] = [];
+  const picked: { id: number; tier: "A" | "B" }[] = [];
+  const tierCount = { A: 0, B: 0 };
+  const size = opts.perTier ? opts.perTier.A + opts.perTier.B : opts.size;
   for (const c of sorted) {
-    if (picked.length >= opts.size) break;
+    if (picked.length >= size) break;
+    const tier = c.tier as "A" | "B";
+    if (opts.perTier && tierCount[tier] >= opts.perTier[tier]) continue;
     const allowed = MAX_PER_COMPANY_30D - c.companyAppsLast30Days;
     const used = taken.get(c.companyId) ?? 0;
     if (used >= allowed) continue;
     taken.set(c.companyId, used + 1);
-    picked.push(c.jobId);
+    tierCount[tier]++;
+    picked.push({ id: c.jobId, tier });
   }
-  return picked;
+  // Tier A first, each tier in rank order.
+  return opts.perTier ? [...picked.filter((p) => p.tier === "A"), ...picked.filter((p) => p.tier === "B")].map((p) => p.id) : picked.map((p) => p.id);
 }

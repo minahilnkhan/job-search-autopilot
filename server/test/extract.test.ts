@@ -51,6 +51,15 @@ describe("citizenship and clearance", () => {
     "Applicants must be U.S. persons as defined by ITAR.",
     "This role is subject to ITAR.",
     "This role involves export-controlled technology; candidates must be U.S. persons.",
+    "Applicants must be U.S. citizens or green card holders.",
+    "Open to US citizens or permanent residents only.",
+    "Candidates must be a US Citizen/Green Card holder.",
+    "Green card holders or U.S. citizens are eligible for this position.",
+    "This position requires U.S. citizenship or permanent residency.",
+    "Must hold a green card.",
+    "We are only considering U.S. citizens at this time.",
+    "Requirements: US citizen or Lawful Permanent Resident (LPR).",
+    "Due to federal contract requirements, United States citizenship is required.",
   ])("flags citizenship: %s", (text) => {
     expect(ex(text).requiresCitizenship).toBe(true);
   });
@@ -64,6 +73,20 @@ describe("citizenship and clearance", () => {
 
   it("doesn't split sentences on 'U.S.'", () => {
     expect(stripBoilerplate("Must be a U.S. citizen. Ship fast.")).toContain("Must be a U.S. citizen.");
+  });
+
+  it("catches a real requirement written in the same sentence as EEO text", () => {
+    const f = ex("We are an equal opportunity employer, and applicants must be U.S. citizens or green card holders due to contract terms.");
+    expect(f.requiresCitizenship).toBe(true);
+  });
+
+  it.each([
+    "We consider all applicants without regard to race, religion, or U.S. citizenship status.",
+    "Employees are eligible for green card sponsorship after one year.",
+    "We sponsor visas and green cards for the right candidates.",
+    "Benefits: 401k, health insurance, and immigration support for permanent residency.",
+  ])("doesn't flag: %s", (text) => {
+    expect(ex(text).requiresCitizenship).toBe(false);
   });
 
   it("strips EEO sentences but keeps the rest", () => {

@@ -29,9 +29,9 @@ export const DEFAULT_SETTINGS: Settings = {
     { question: "When can you start?", answer: "[your start date or notice period]" },
     { question: "What are your salary expectations?", answer: "[your answer, or leave it open]" },
   ],
-  // High-fit, fresh postings only: early applicants to a strong match beat
-  // late applicants to a long list.
-  shortlist: { minFitScore: 8, maxAgeDays: 14, preferredCityBoost: 1 },
+  // A daily deck of the best fresh postings: 5 Tier A (tailored) and 5 Tier B
+  // (quick apply). Early applicants to a strong match beat late ones.
+  shortlist: { tierAPicks: 5, tierBPicks: 5, maxAgeDays: 14, preferredCityBoost: 1 },
   pipeline: {
     enabled: true,
     dailyTime: "07:00",

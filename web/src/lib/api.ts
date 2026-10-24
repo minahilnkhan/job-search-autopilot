@@ -68,12 +68,20 @@ export const api = {
   bases: () => request<BaseResume[]>("GET", "/api/resumes/bases"),
   saveBase: (type: BaseType, text: string) => request<BaseResume>("PUT", `/api/resumes/bases/${type}`, { text }),
   prepare: (jobId: number) => request<ApplicationDetail>("POST", "/api/applications", { jobId }),
+  /** Accept from the deck: returns at once; the application appears in Review when ready. */
+  prepareInBackground: (jobId: number) => request<{ jobId: number; preparing: boolean }>("POST", "/api/applications", { jobId, background: true }),
+  preparing: () =>
+    request<{ jobId: number; jobTitle: string; companyName: string; startedAt: number; error: string | null }[]>("GET", "/api/applications/preparing"),
+  dismissPreparing: (jobId: number) => request<{ ok: boolean }>("DELETE", `/api/applications/preparing/${jobId}`),
+  refillShortlist: () => request<Shortlist | null>("POST", "/api/shortlist/refill", {}),
+  redraftNote: (id: number) => request<ApplicationDetail>("POST", `/api/applications/${id}/note`, {}),
+  restart: (id: number) => request<ApplicationDetail>("POST", `/api/applications/${id}/restart`, {}),
   applications: (view: "review" | "blocked" | "snoozed" | "approved" | "closed") =>
     request<ApplicationSummary[]>("GET", `/api/applications?view=${view}`),
   application: (id: number) => request<ApplicationDetail>("GET", `/api/applications/${id}`),
   editApplication: (
     id: number,
-    body: { recruiterNote?: string | null; answers?: { index: number; answer: string }[]; lines?: { id: string; text: string }[] }
+    body: { recruiterNote?: string | null; contact?: string; answers?: { index: number; answer: string }[]; lines?: { id: string; text: string }[] }
   ) => request<ApplicationDetail>("PATCH", `/api/applications/${id}`, body),
   regenerate: (id: number) => request<ApplicationDetail>("POST", `/api/applications/${id}/regenerate`, {}),
   override: (id: number, reason: string) => request<ApplicationDetail>("POST", `/api/applications/${id}/override`, { reason }),

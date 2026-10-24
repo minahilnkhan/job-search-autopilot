@@ -6,6 +6,7 @@ import {
   getShortlist,
   isPipelineRunning,
   listRuns,
+  rebuildTodaysShortlist,
   requestStop,
   runPipeline,
   scoreJob,
@@ -35,6 +36,13 @@ export function pipelineRoutes(app: FastifyInstance, db: DB, deps: PipelineDeps)
 
   // Stops after the few calls already in flight; everything scored so far is kept.
   app.post("/api/pipeline/stop", async () => ({ stopping: requestStop() }));
+
+  // After you accept or skip a job: top today's deck back up from the
+  // next-ranked jobs. Free: no fetching, no AI calls.
+  app.post("/api/shortlist/refill", async () => {
+    rebuildTodaysShortlist(db);
+    return getShortlist(db);
+  });
 
   app.get("/api/shortlist", async (req) => {
     const { date } = req.query as { date?: string };

@@ -126,7 +126,8 @@ export type Settings = {
   /** Your own answers to common application questions, reused as-is (never AI-written). */
   standardAnswers: { question: string; answer: string }[];
   shortlist: {
-    minFitScore: number; // 1–10; jobs below this never make Today's picks
+    tierAPicks: number; // how many Tier A (8–10) jobs in today's deck
+    tierBPicks: number; // how many Tier B (5–7) jobs in today's deck
     maxAgeDays: number; // postings older than this never make Today's picks
     preferredCityBoost: number; // extra ranking points for jobs in a preferred city (Chicago)
   };
