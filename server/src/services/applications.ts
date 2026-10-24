@@ -4,7 +4,7 @@ import { and, desc, eq, inArray, ne } from "drizzle-orm";
 import type { DB } from "../db/client";
 import { applications, companies, jobs, resumeVersions } from "../db/schema";
 import { config } from "../config";
-import { resumeLines, serializeResume, setLine } from "../domain/resumeFormat";
+import { removeLine, resumeLines, serializeResume, setLine } from "../domain/resumeFormat";
 import { applyPlan, chooseBase, resumeForPrompt } from "../domain/tailorPlan";
 import { runTruthCheck, type CheckLine } from "../domain/truthCheck";
 import { assertTransition } from "../domain/applicationStatus";
@@ -366,13 +366,31 @@ export async function editApplication(db: DB, id: number, patch: ApplicationPatc
     const changes = [...(version.diffFromBase ?? [])];
     const current = new Map(resumeLines(content).map((l) => [l.id, l]));
     current.set("contact", { id: "contact", where: "Contact line", text: content.contact, kind: "line" });
+    // Emptied lines are deletions, done after the edits and from the bottom up,
+    // so earlier ids still point at the right lines.
+    const removals = patch.lines.filter((l) => !l.text.trim() && current.has(l.id));
+    if (removals.some((l) => l.id === "contact")) throw new ConflictError("The contact line can't be empty.");
     for (const { id: lineId, text } of patch.lines) {
       const before = current.get(lineId);
-      if (!before || before.text === text.trim()) continue;
+      if (!before || !text.trim() || before.text === text.trim()) continue;
       content = setLine(content, lineId, text.trim());
       const existing = changes.find((c) => c.id === lineId);
       if (existing) Object.assign(existing, { after: text.trim(), reason: "Edited by you" });
       else changes.push({ id: lineId, where: before.where, before: before.text, after: text.trim(), reason: "Edited by you" });
+    }
+    const order = (id: string) => id.split(/[.L]+/).filter(Boolean).map(Number);
+    removals.sort((a, b) => {
+      const [x, y] = [order(a.id), order(b.id)];
+      for (let k = 0; k < Math.max(x.length, y.length); k++) if ((x[k] ?? -1) !== (y[k] ?? -1)) return (y[k] ?? -1) - (x[k] ?? -1);
+      return 0;
+    });
+    for (const { id: lineId } of removals) {
+      const before = current.get(lineId)!;
+      content = removeLine(content, lineId);
+      const i = changes.findIndex((c) => c.id === lineId);
+      const removed = { id: `${lineId}.removed`, where: before.where, before: i === -1 ? before.text : changes[i]!.before, after: "(removed)", reason: "Deleted by you" };
+      if (i === -1) changes.push(removed);
+      else changes.splice(i, 1, removed);
     }
     db.update(resumeVersions).set({ content, diffFromBase: changes }).where(eq(resumeVersions.id, version.id)).run();
   }

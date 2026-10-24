@@ -117,7 +117,7 @@ export function applicationRoutes(app: FastifyInstance, db: DB, deps: PrepDeps) 
         recruiterNote: z.string().nullable().optional(),
         contact: z.string().min(1).optional(),
         answers: z.array(z.object({ index: z.number().int().min(0), answer: z.string() })).optional(),
-        lines: z.array(z.object({ id: z.string(), text: z.string().min(1) })).optional(),
+        lines: z.array(z.object({ id: z.string(), text: z.string() })).optional(), // empty text = delete the line
       })
       .parse(req.body);
     return editApplication(db, id, body, deps);

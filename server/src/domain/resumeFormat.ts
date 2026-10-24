@@ -122,3 +122,25 @@ export function setLine(r: ResumeContent, id: string, text: string): ResumeConte
   }
   return copy;
 }
+
+/**
+ * Delete one bullet or section line by id. A section left with nothing in it
+ * (e.g. an emptied summary) goes too. The contact line can't be deleted.
+ */
+export function removeLine(r: ResumeContent, id: string): ResumeContent {
+  if (id === "contact") throw new ResumeFormatError("The contact line can't be empty.");
+  const copy: ResumeContent = structuredClone(r);
+  const m = /^(\d+)\.(?:L(\d+)|(\d+)\.(\d+))$/.exec(id);
+  const section = m ? copy.sections[Number(m[1])] : undefined;
+  if (!m || !section) throw new ResumeFormatError(`Unknown line id "${id}"`);
+  if (m[2] !== undefined) {
+    if (section.lines[Number(m[2])] === undefined) throw new ResumeFormatError(`Unknown line id "${id}"`);
+    section.lines.splice(Number(m[2]), 1);
+  } else {
+    const entry = section.entries[Number(m[3])];
+    if (!entry || entry.bullets[Number(m[4])] === undefined) throw new ResumeFormatError(`Unknown line id "${id}"`);
+    entry.bullets.splice(Number(m[4]), 1);
+  }
+  if (section.lines.length === 0 && section.entries.length === 0) copy.sections.splice(Number(m[1]), 1);
+  return copy;
+}

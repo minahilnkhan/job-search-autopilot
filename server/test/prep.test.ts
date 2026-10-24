@@ -337,6 +337,25 @@ describe("base resume first, notes for every application, restart, background pr
     expect(res.body.resume.contact).toBe("Chicago, IL | me@example.com");
   });
 
+  it("emptying lines deletes them (bullets from the bottom up, an emptied section goes), but not the contact line", async () => {
+    await saveBases();
+    const jobId = await addJob("Software Engineer", "B");
+    const a = (await req("POST", "/api/applications", { jobId })).body;
+    const res = await req("PATCH", `/api/applications/${a.id}`, {
+      lines: [
+        { id: "0.0.0", text: "" },
+        { id: "0.0.2", text: "" },
+        { id: "0.0.1", text: "Built the Claude pipeline end to end" },
+        { id: "2.L0", text: "  " },
+      ],
+    });
+    expect(res.status).toBe(200);
+    expect(res.body.resume.sections[0].entries[0].bullets).toEqual(["Built the Claude pipeline end to end"]);
+    expect(res.body.resume.sections.map((s: { title: string }) => s.title)).toEqual(["Experience", "Education"]);
+    expect(res.body.changes.filter((c: { after: string }) => c.after === "(removed)")).toHaveLength(3);
+    expect((await req("PATCH", `/api/applications/${a.id}`, { lines: [{ id: "contact", text: "" }] })).status).toBe(409);
+  });
+
   it("restart rebuilds from the current base and closes the old application", async () => {
     await saveBases();
     const jobId = await addJob("Software Engineer", "B");

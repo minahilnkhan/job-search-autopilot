@@ -253,16 +253,42 @@ function Detail({ id, onChanged, onOpen }: { id: number; onChanged: () => void; 
               </button>
             </div>
             {shownLines.length === 0 && <p className="text-[15px] text-ink-soft">Nothing changed or flagged.</p>}
-            {shownLines.map((l) => (
-              <div key={l.id}>
-                <label className="label" htmlFor={`l-${l.id}`}>
-                  {l.where}
-                  {flaggedIds.has(l.id) && <span className="ml-2 text-fail">flagged</span>}
-                </label>
-                <textarea id={`l-${l.id}`} rows={2} className={`field font-serif ${flaggedIds.has(l.id) ? "border-fail" : ""}`}
-                  value={lineEdits[l.id] ?? l.text} onChange={(e) => setLineEdits((m) => ({ ...m, [l.id]: e.target.value }))} />
-              </div>
-            ))}
+            {shownLines.map((l) => {
+              const deleting = lineEdits[l.id] !== undefined && !lineEdits[l.id]!.trim();
+              return (
+                <div key={l.id}>
+                  <div className="flex items-baseline justify-between gap-3">
+                    <label className="label" htmlFor={`l-${l.id}`}>
+                      {l.where}
+                      {flaggedIds.has(l.id) && <span className="ml-2 text-fail">flagged</span>}
+                    </label>
+                    {l.id !== "contact" && (
+                      <button type="button" className="text-sm font-medium text-ink-soft underline underline-offset-2 hover:text-fail"
+                        onClick={() =>
+                          setLineEdits((m) => {
+                            if (deleting) {
+                              const { [l.id]: _drop, ...rest } = m;
+                              return rest;
+                            }
+                            return { ...m, [l.id]: "" };
+                          })
+                        }>
+                        {deleting ? "Keep this line" : "Delete line"}
+                      </button>
+                    )}
+                  </div>
+                  {deleting ? (
+                    <p className="rounded-md border border-dashed border-fail px-3 py-2 font-serif text-[15px] text-ink-soft line-through">{l.text}</p>
+                  ) : (
+                    <textarea id={`l-${l.id}`} rows={2} className={`field font-serif ${flaggedIds.has(l.id) ? "border-fail" : ""}`}
+                      value={lineEdits[l.id] ?? l.text} onChange={(e) => setLineEdits((m) => ({ ...m, [l.id]: e.target.value }))} />
+                  )}
+                </div>
+              );
+            })}
+            {Object.entries(lineEdits).some(([id, t]) => !t.trim() && id !== "contact") && (
+              <p className="text-sm text-ink-soft">Deleted lines are removed when you press Save and re-check.</p>
+            )}
           </div>
         )}
 
