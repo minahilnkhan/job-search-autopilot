@@ -56,7 +56,6 @@ describe("extension chat", () => {
           { question: "Are you legally authorized to work in the United States?", answer: "No" },
           { question: "Why Acme?", answer: "I build customer-facing LLM features." },
         ],
-        recruiterNote: "",
       },
     }));
     const p = (await req("POST", `/api/extension/applications/${a.id}/chat`, { message: "tweak it", history: [{ role: "user", text: "hi" }], formQuestions: ["Why Acme?"] }, h)).body;
@@ -81,7 +80,7 @@ describe("extension chat", () => {
     let pages = 1;
     const base = fakeRenderer();
     const renderer: typeof base = async (c, dir) => ({ ...(await base(c, dir)), pages });
-    const { req, a, h } = await setup(() => ({ reply: "Added.", edits: { lines: [{ id: "0.0.0", text: "Owned the Word Splitter feature end to end, with teachers" }], answers: [], recruiterNote: "" } }), renderer);
+    const { req, a, h } = await setup(() => ({ reply: "Added.", edits: { lines: [{ id: "0.0.0", text: "Owned the Word Splitter feature end to end, with teachers" }], answers: [] } }), renderer);
     pages = 2;
     const p = (await req("POST", `/api/extension/applications/${a.id}/chat`, { message: "add" }, h)).body;
     const r = (await req("POST", `/api/extension/applications/${a.id}/chat/apply`, { edits: p.edits }, h)).body;
@@ -90,7 +89,7 @@ describe("extension chat", () => {
   });
 
   it("drafts a follow-up for a submitted application", async () => {
-    const { db, req, a } = await setup(() => ({ reply: "", edits: { lines: [], answers: [], recruiterNote: "" } }));
+    const { db, req, a } = await setup(() => ({ reply: "", edits: { lines: [], answers: [] } }));
     expect((await req("POST", `/api/applications/${a.id}/follow-up/draft`)).status).toBe(409);
     db.update(applications).set({ status: "submitted", submittedAt: new Date(Date.now() - 8 * 86_400_000) }).where(eq(applications.id, a.id)).run();
     const r = (await req("POST", `/api/applications/${a.id}/follow-up/draft`)).body;
@@ -99,7 +98,7 @@ describe("extension chat", () => {
   });
 
   it("summary counts what's waiting at each step", async () => {
-    const { req } = await setup(() => ({ reply: "", edits: { lines: [], answers: [], recruiterNote: "" } }));
+    const { req } = await setup(() => ({ reply: "", edits: { lines: [], answers: [] } }));
     const s = (await req("GET", "/api/summary")).body;
     expect(s).toMatchObject({ approved: 1, review: 0, today: { submitted: 0, target: 10 }, week: { target: 70 } }); // 10 a day × 7 days (mentor prompt v2)
   });

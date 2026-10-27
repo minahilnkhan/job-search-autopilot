@@ -33,7 +33,7 @@ const ANSWERS: Answer[] = [
   { question: "Are you legally authorized to work in the United States?", answer: "Yes", source: "fixed" },
   { question: "Will you now or in the future require sponsorship for employment visa status (e.g., H-1B)?", answer: "Yes", source: "fixed" },
 ];
-const VALUES: PrefillValues = { profile: PROFILE, answers: ANSWERS, recruiterNote: "I ship production Claude features.", resumeFileName: "Minahil_Khan_Resume.pdf" };
+const VALUES: PrefillValues = { profile: PROFILE, answers: ANSWERS, resumeFileName: "Minahil_Khan_Resume.pdf" };
 
 const control = (over: Partial<FormControl>): FormControl => ({ id: "x", kind: "text", label: "", hints: "", required: false, value: "", options: [], ...over });
 
@@ -157,7 +157,7 @@ describe.skipIf(!chromiumPath)("prefill on form layouts like Greenhouse, Lever a
     expect(await page.evaluate(() => ({ s: (window as { __submitted?: boolean }).__submitted ?? false, c: (window as { __clicked?: number }).__clicked ?? 0 }))).toEqual({ s: false, c: 0 });
   }, 20000);
 
-  it("Lever: full name, URLs, radio and select answers, note in Additional information; checkbox and EEO left", async () => {
+  it("Lever: full name, URLs, radio and select answers; optional Additional information left empty; checkbox and EEO left", async () => {
     const page = await open("lever.html");
     const r = await prefillPage(page, VALUES, resume);
     expect(await val(page, "input[name=name]")).toBe("Minahil Khan");
@@ -169,7 +169,7 @@ describe.skipIf(!chromiumPath)("prefill on form layouts like Greenhouse, Lever a
     expect(await page.locator("input[name='cards[a][field0]'][value=Yes]").isChecked()).toBe(true);
     expect(await val(page, "select[name='cards[a][field1]']")).toBe("Yes");
     expect(await page.locator("input[name='cards[a][field2]'][value=Yes]").isChecked()).toBe(true); // "Yes, anywhere in the US."
-    expect(await val(page, "textarea[name=comments]")).toBe("I ship production Claude features.");
+    expect(await val(page, "textarea[name=comments]")).toBe(""); // optional cover-letter box: no model call spent on it
     expect(await page.locator("input[name='cards[a][field3]']").isChecked()).toBe(false);
     expect(await val(page, "select[name='eeo[gender]']")).toBe("");
     expect(r.leftForYou).toEqual(expect.arrayContaining([expect.objectContaining({ reason: "Checkbox: read it and tick it yourself", required: true })]));
@@ -538,7 +538,7 @@ describe.skipIf(!chromiumPath)("extension fill script", () => {
     expect(await page.locator("input[name=name]").inputValue()).toBe("Minahil Khan");
     expect(await page.locator("input[name='cards[a][field0]'][value=Yes]").isChecked()).toBe(true);
     expect(await page.locator("select[name='cards[a][field1]']").inputValue()).toBe("Yes");
-    expect(await page.locator("textarea[name=comments]").inputValue()).toBe("I ship production Claude features.");
+    expect(await page.locator("textarea[name=comments]").inputValue()).toBe(""); // optional box left empty
   }, 20000);
 });
 

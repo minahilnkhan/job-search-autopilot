@@ -41,33 +41,33 @@ Every AI call is logged with its token counts and cost. The mentor prompt and in
 **Accept and prepare** on a job builds the application:
 
 - **Tier A:** Claude Sonnet 5.5 tailors the matching base resume (FDE or SWE) following [docs/tailoring.md](docs/tailoring.md): pull the posting's keywords and must-haves, match them against the resume and the inventory, rewrite and reorder bullets so matches come first, add up to three truthful sentences for keywords the inventory supports, drop weaker bullets to stay on one page, and write a summary under 50 words that starts with the posting's role noun. It can't add employers, titles, dates or numbers that aren't in the inventory. Swaps it can't make (e.g. bringing in the TA role) show up as suggestions in Review.
-- **Tier B:** the base resume as-is, plus your standard answers, and a short recruiter note (one small Sonnet call).
+- **Tier B:** the base resume as-is, plus your standard answers. No model call: Tier B costs nothing to prepare.
 - **Accept returns right away.** Preparation runs in the background; the application appears in Review (under Needs fixes if the Truth Check flags something). A base resume with Truth Check problems has to be fixed on the Resumes page first.
-- **Fix where it's flagged:** every Truth Check problem in Review has its own edit box (resume line, contact line, answer or note). "Write it again" redrafts the note; "Rebuild from base resume" restarts an application after you fix the base.
+- **Fix where it's flagged:** every Truth Check problem in Review has its own edit box (resume line, contact line or answer). "Rebuild from base resume" restarts an application after you fix the base.
 - **Work-authorization answers** always come from Settings and can't be edited per application.
 
-Then the **Truth Check** runs in code over every resume line, the note and every answer:
+Then the **Truth Check** runs in code over every resume line and every answer:
 
 | Check | Example it blocks |
 |---|---|
 | Every number must appear in `candidate_inventory.md` (50K = 50,000; ~ and + ignored) | "used by 12 teams" when 12 isn't in the inventory |
 | Nothing on the DO NOT CLAIM list, which is parsed from the inventory into `do_not_claim.json` | "Cut latency 60%" |
 | No ownership verbs (designed, built, architected…) on work the inventory says someone else designed | "Designed the caching layer" |
-| No unfilled `[placeholders]`; recruiter note under 100 words | "[email]" |
+| No unfilled `[placeholders]` | "[email]" |
 | Banned style words (warning only) | "leveraged" |
 
 Any failure keeps the application out of the review queue, showing the exact line, where it is and why, until you fix it or override it with a written reason. Any later edit clears the override. A PDF that's missing or longer than one page always blocks approval.
 
 The **resume** is one structure rendered two ways: Chromium prints the HTML template to PDF (page count checked with pdf-lib), and the `docx` library writes the matching DOCX. They can't drift apart.
 
-The **Review** page shows the job, its score and gaps, each resume change as before → after, a PDF preview, the note and the answers, all editable inline. Actions: **Approve** (one application at a time), **Not applying** (with a reason, kept for tuning scoring), **Snooze**.
+The **Review** page shows the job, its score and gaps, each resume change as before → after, a PDF preview and the answers, all editable inline. Actions: **Approve** (one application at a time), **Not applying** (with a reason, kept for tuning scoring), **Snooze**.
 
 ## How a day works
 
 The app is four places: **Today**, **Applications**, **Jobs** and **Settings** (with Resumes and Companies inside it). Today is a four-step checklist:
 
 1. **Pick today's jobs**: a deck of Tier A then Tier B picks. Swipe or use ← → to accept or skip.
-2. **Review and approve**: one application at a time, with ‹ › to the next. What changed in the resume, the Truth Check result and the recruiter note up front; answers and the score folded away.
+2. **Review and approve**: one application at a time, with ‹ › to the next. What changed in the resume, and the Truth Check result up front; answers and the score folded away.
 3. **Submit**: open each approved application in Chrome and press **Fill** in the extension.
 4. **Follow up**: Tier A applications a week after submitting, with **Draft a follow-up**.
 
@@ -86,7 +86,7 @@ The extension proves it's yours with a pairing code from Settings. The server al
 - Name, email, phone, location, LinkedIn/GitHub and current company, from **Settings → Profile**.
 - Your resume PDF, uploaded under a proper file name.
 - Work-authorization questions, always with the fixed answers from Settings.
-- Any question that closely matches one of the application's prepared answers, and the recruiter note in "cover letter / additional information" boxes.
+- Any question that closely matches one of the application's prepared answers. Optional "cover letter / additional information" boxes stay empty.
 
 Questions nothing prepared covers ("Why Anthropic?", "Tell us about a project") are drafted on the spot by Claude Sonnet from your inventory and the posting, Truth-Checked, and typed in. When an answer depends on something only you know (salary, start date, a referral) or a draft fails the Truth Check, the app asks you in a **Questions for you** chat on that application; your reply goes straight into the open form, and you can keep it for every application.
 

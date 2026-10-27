@@ -241,7 +241,7 @@ export type TruthIssueKind = "unverified_number" | "do_not_claim" | "ownership" 
 export type TruthIssue = {
   kind: TruthIssueKind;
   severity: "fail" | "warn";
-  where: string; // e.g. "Resume › Experience › Yabla › bullet 2", "Recruiter note"
+  where: string; // e.g. "Resume › Experience › Yabla › bullet 2"
   text: string; // the offending line
   message: string; // why, in plain words
   lineId?: string; // resume line id, so the UI can jump to it
@@ -277,22 +277,12 @@ export type ApplicationSummary = {
   createdAt: number;
 };
 
-/** What a recruiter note was built around: shown under the note in Review. */
-export type NoteBasis = {
-  companyValue: string; // e.g. "Customer obsession"
-  valueSource: string; // the posting's own words for it, or "" if the posting states none
-  story: string; // which inventory story shows it
-  standout: string; // the one memorable detail
-};
-
 export type ApplicationDetail = ApplicationSummary & {
   job: Job;
   baseType: BaseType;
   resume: ResumeContent;
   resumeText: string;
   changes: ResumeChange[];
-  recruiterNote: string | null;
-  noteBasis: NoteBasis | null;
   prefillReport: PrefillReport | null;
   applyUrl: string | null; // the application form, for "Open in my browser"
   submittedAt: number | null;

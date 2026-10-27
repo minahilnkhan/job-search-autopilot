@@ -53,7 +53,6 @@ function CopyPanel({ app, profile, open }: { app: ApplicationDetail; profile: Pr
             Download the PDF to attach
           </a>
         </div>
-        <CopyRow label="Recruiter note (cover letter or 'additional information')" value={app.recruiterNote ?? ""} />
         {app.answers.map((a, i) => (
           <CopyRow key={i} label={a.question} value={a.answer} />
         ))}

@@ -18,7 +18,7 @@ import type { Answer } from "../../../shared/types";
 // if it still passes the Truth Check and fits on one page; otherwise it goes
 // back to Review with the reason.
 
-export type ProposedEdit = { kind: "line" | "answer" | "note"; key: string; label: string; before: string; after: string };
+export type ProposedEdit = { kind: "line" | "answer"; key: string; label: string; before: string; after: string };
 export type ChatProposal = { reply: string; edits: ProposedEdit[]; blocked: { label: string; reason: string }[] };
 
 const EDITABLE = ["draft", "ready_for_review", "approved"];
@@ -46,7 +46,6 @@ export async function proposeChat(
       resumeLines: lines.map((l) => `[${l.id}] ${l.where}: ${l.text}`).join("\n"),
       answers: app.answers.map((a) => ({ question: a.question, answer: a.answer })),
       formQuestions: input.formQuestions,
-      recruiterNote: app.recruiterNote,
       history: input.history,
       message: input.message,
     });
@@ -57,9 +56,9 @@ export async function proposeChat(
   }
 
   const facts = deps.facts?.();
-  const fail = (where: string, text: string, note = false) => {
+  const fail = (where: string, text: string) => {
     if (!facts || !text.trim()) return null;
-    const r = note ? runTruthCheck({ lines: [], recruiterNote: text }, facts) : runTruthCheck({ lines: [{ where, text }] }, facts);
+    const r = runTruthCheck({ lines: [{ where, text }] }, facts);
     return r.issues.find((i) => i.severity === "fail")?.message ?? null;
   };
   const edits: ProposedEdit[] = [];
@@ -82,12 +81,6 @@ export async function proposeChat(
     const problem = fail(`Answer › ${e.question}`, e.answer);
     if (problem) blocked.push({ label: e.question, reason: problem });
     else edits.push({ kind: "answer", key: e.question, label: e.question, before: current?.answer ?? "", after: e.answer.trim() });
-  }
-  const note = result.edits.recruiterNote.trim();
-  if (note && note !== (app.recruiterNote ?? "")) {
-    const problem = fail("Recruiter note", note, true);
-    if (problem) blocked.push({ label: "Recruiter note", reason: problem });
-    else edits.push({ kind: "note", key: "note", label: "Recruiter note", before: app.recruiterNote ?? "", after: note });
   }
   return { reply: result.reply, edits, blocked };
 }
@@ -114,7 +107,6 @@ export async function applyChatEdits(db: DB, id: number, prep: PrepDeps, edits: 
         .filter((e) => e.kind === "answer")
         .map((e) => ({ index: answers.findIndex((a) => a.question === e.key), answer: e.after }))
         .filter((a) => a.index >= 0 && answers[a.index]!.source !== "fixed"),
-      ...(edits.some((e) => e.kind === "note") ? { recruiterNote: edits.find((e) => e.kind === "note")!.after } : {}),
     },
     prep,
     now
@@ -143,10 +135,10 @@ export async function draftFollowUp(db: DB, id: number, deps: SubmitDeps, now = 
   if ("unavailable" in w) throw new ConflictError(`Can't draft a follow-up: ${w.unavailable}`);
   const days = Math.max(0, Math.round((now.getTime() - app.submittedAt) / 86_400_000));
   try {
-    const r = await w.writer({ companyName: app.companyName, title: app.jobTitle, recruiterNote: app.recruiterNote, daysSince: days });
+    const r = await w.writer({ companyName: app.companyName, title: app.jobTitle, daysSince: days });
     recordUsage(db, { purpose: "follow_up", model: r.model, usage: r.usage, jobId: app.jobId, now });
     const facts = deps.facts?.();
-    const issue = facts ? runTruthCheck({ lines: [], recruiterNote: r.text }, facts).issues.find((i) => i.severity === "fail" && i.kind !== "length") : undefined;
+    const issue = facts ? runTruthCheck({ lines: [{ where: "Follow-up", text: r.text }] }, facts).issues.find((i) => i.severity === "fail") : undefined;
     return { text: r.text, warning: issue?.message ?? null, date: localDate(now, settings.pipeline.timezone) };
   } catch (err) {
     if (err instanceof ScoreError && err.usage) recordUsage(db, { purpose: "follow_up", model: settings.models.tailoring, usage: err.usage, jobId: app.jobId, now });

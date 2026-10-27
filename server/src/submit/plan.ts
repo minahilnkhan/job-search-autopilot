@@ -35,7 +35,6 @@ export type FillPlan = { actions: FillAction[]; leftForYou: LeftForYou[]; unansw
 export type PrefillValues = {
   profile: Profile;
   answers: Answer[];
-  recruiterNote: string | null;
   resumeFileName: string;
   /** The job is outside the US: the US work-auth answers don't apply to its form. */
   jobOutsideUS?: boolean;
@@ -203,12 +202,9 @@ export function planFill(controls: FormControl[], v: PrefillValues): FillPlan {
       continue;
     }
 
-    // The recruiter note fits "cover letter" / "additional information" boxes.
-    if (c.kind === "textarea" && NOTE_LABEL.test(label)) {
-      if (v.recruiterNote) actions.push({ op: "fill", id: c.id, label: short(c.label), value: v.recruiterNote });
-      else if (c.required) left("No recruiter note yet");
-      continue;
-    }
+    // Optional "cover letter" / "additional information" boxes stay empty: no
+    // model call is spent on them. Required ones go to the answer writer below.
+    if (c.kind === "textarea" && NOTE_LABEL.test(label) && !c.required) continue;
 
     // Prepared answers (standard and generated), by question similarity.
     const best = v.answers
@@ -229,7 +225,9 @@ export function planFill(controls: FormControl[], v: PrefillValues): FillPlan {
     }
     if (c.required || label) {
       leftForYou.push({ label: short(c.label), reason: c.required ? "No prepared answer" : "Optional, no prepared answer", required: c.required, controlId: c.id });
-      if (label) unanswered.push(c);
+      // The answer writer (a model call) only drafts required fields and optional
+      // essay boxes. Other optional fields are left for you.
+      if (label && (c.required || c.kind === "textarea")) unanswered.push(c);
     }
   }
   return { actions, leftForYou, unanswered };

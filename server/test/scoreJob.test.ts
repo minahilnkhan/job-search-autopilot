@@ -62,11 +62,12 @@ describe("mentor prompt slots", () => {
     "<tracker_state>[injected by app: applications today]</tracker_state>",
   ].join("\n");
 
-  it("fills the inventory slot and marks the others as not used", async () => {
+  it("fills the inventory slot and drops the slots scoring doesn't need", async () => {
     const { scoringSystemPrompt } = await import("../src/llm/scoreJob");
     const out = scoringSystemPrompt({ mentorPrompt: prompt, inventory: "Yabla — Software Engineer" });
     expect(out).toContain("<candidate_inventory>\nYabla — Software Engineer\n</candidate_inventory>");
-    expect(out).toContain("<current_resume>\n(Not used for job scoring.)\n</current_resume>");
+    expect(out).not.toContain("<current_resume>"); // not sent: no tokens spent on "(Not used)"
+    expect(out).not.toContain("<tracker_state>");
     expect(out).not.toContain("[inject");
     expect(out.match(/<candidate_inventory>/g)).toHaveLength(1);
   });
@@ -88,8 +89,6 @@ describe("request settings (thinking counts toward max_tokens)", () => {
         ? JSON.stringify({ mustHaves: [], summary: { headline: "", text: "" }, lineEdits: [], bulletOrder: [], addBullets: [], removeBullets: [], answers: [], keywordsCovered: [], keywordsMissing: [], honestGaps: [], suggestions: [] })
         : req.includes("items")
           ? JSON.stringify({ items: [{ id: "ap1", action: "ask", answer: "", ask: "What salary should I put?" }] })
-          : req.includes("recruiterNote")
-          ? JSON.stringify({ companyValue: "Ownership", valueSource: "you own problems end to end", story: "Morphemic Dictionary", standout: "Teachers checked it", recruiterNote: " A note. " })
           : JSON.stringify(GOOD_JUDGMENT);
       return new Response(
         JSON.stringify({ id: "m", type: "message", role: "assistant", model: body.model, content: [{ type: "text", text }], stop_reason: "end_turn", stop_sequence: null, usage: { input_tokens: 10, output_tokens: 10 } }),
@@ -117,22 +116,11 @@ describe("request settings (thinking counts toward max_tokens)", () => {
     expect(bodies[0]).not.toHaveProperty("thinking");
   });
 
-  it("the note writer sends company notes, returns what the note is built around, and has room to think", async () => {
-    const { makeAnthropicNoteWriter } = await import("../src/llm/note");
-    const { bodies, fetchStub } = capture();
-    const write = makeAnthropicNoteWriter({ apiKey: "test", model: "claude-sonnet-5-5", context, fetch: fetchStub });
-    const r = await write({ companyName: "Acme", title: "FDE", description: "JD", resumeText: "# Me", companyNotes: "Values: ownership" });
-    expect(r.note).toBe("A note.");
-    expect(r.basis).toEqual({ companyValue: "Ownership", valueSource: "you own problems end to end", story: "Morphemic Dictionary", standout: "Teachers checked it" });
-    expect(bodies[0]).toMatchObject({ output_config: { effort: "medium" }, max_tokens: 8000 });
-    expect(JSON.stringify(bodies[0]!.messages)).toContain("<company_notes>\\nValues: ownership");
-  });
-
   it("the answer writer sends each question with its options and returns answer/ask items", async () => {
     const { makeAnthropicAnswerWriter } = await import("../src/llm/answers");
     const { bodies, fetchStub } = capture();
     const write = makeAnthropicAnswerWriter({ apiKey: "test", model: "claude-sonnet-5-5", context, fetch: fetchStub });
-    const r = await write({ companyName: "Acme", title: "FDE", description: "JD", resumeText: "# Me", recruiterNote: null, questions: [{ id: "ap1", label: "Salary?", kind: "select", options: ["<100k", "100k+"], required: true }] });
+    const r = await write({ companyName: "Acme", title: "FDE", description: "JD", resumeText: "# Me", questions: [{ id: "ap1", label: "Salary?", kind: "select", options: ["<100k", "100k+"], required: true }] });
     expect(r.items).toEqual([{ id: "ap1", action: "ask", answer: "", ask: "What salary should I put?" }]);
     expect(JSON.stringify(bodies[0]!.messages)).toContain('kind=\\"select\\" required>Salary?\\nOptions: <100k | 100k+');
   });

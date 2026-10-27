@@ -11,7 +11,7 @@ import type { FormControl, LeftForYou } from "../../server/src/submit/plan";
 type Cfg = { appUrl: string; code: string };
 type Match = { best: number | null; applications: { id: number; jobTitle: string; companyName: string }[] };
 type Ask = { id: string; label: string; question: string; draft: string | null; required: boolean; frameId: number; localId: string; answer?: string; filled?: boolean };
-type Edit = { kind: "line" | "answer" | "note"; key: string; label: string; before: string; after: string };
+type Edit = { kind: "line" | "answer"; key: string; label: string; before: string; after: string };
 type Msg =
   | { role: "user"; text: string }
   | { role: "assistant"; text: string; edits: Edit[]; blocked: { label: string; reason: string }[]; state?: "applied" | "discarded"; result?: string }
@@ -38,7 +38,6 @@ let draft = "";
 
 const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]!);
 const clean = (s: string) => s.replace(/[✱*]\s*$/, "").replace(/\s+/g, " ").trim().toLowerCase();
-const NOTE_FIELD = /cover letter|additional information|anything else|message to (the )?(hiring|recruit)/i;
 
 const cut = (t: string, n: number) => (t.length > n ? t.slice(0, n - 1) + "…" : t);
 
@@ -242,7 +241,7 @@ async function applyEdits(m: Extract<Msg, { role: "assistant" }>) {
     const notes: string[] = [];
     for (const e of m.edits) {
       const target =
-        e.kind === "answer" ? fields.find((f) => clean(f.label) === clean(e.key)) : e.kind === "note" ? fields.find((f) => f.kind === "textarea" && NOTE_FIELD.test(f.label)) : undefined;
+        e.kind === "answer" ? fields.find((f) => clean(f.label) === clean(e.key)) : undefined;
       if (target && !(await fillOne(target.frameId, target.id, e.after))) notes.push(`Couldn't type "${e.label}" into the form; paste it.`);
     }
     if (r.resumeChanged && r.status === "approved" && tab) {
@@ -306,7 +305,7 @@ function fillView(): string {
 function chatView(): string {
   const parts: string[] = [];
   if (!messages.length)
-    parts.push(`<p class="soft">Ask for a change to your resume, recruiter note or answers, like "Shorten Why Anthropic to two sentences" or "Mention the Roblox HQ camp in the note". Every change is Truth-Checked before you see it, and nothing changes until you press Apply.</p>`);
+    parts.push(`<p class="soft">Ask for a change to your resume or answers, like "Shorten Why Anthropic to two sentences" or "Lead with the Yabla project". Every change is Truth-Checked before you see it, and nothing changes until you press Apply.</p>`);
   messages.forEach((m, i) => {
     if (m.role === "user") parts.push(`<div class="me">${esc(m.text)}</div>`);
     else if (m.role === "ask") {

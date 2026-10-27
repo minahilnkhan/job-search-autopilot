@@ -229,3 +229,11 @@ Her fixed work-authorization answers are about the US. On a job abroad, a questi
 - **Skills: "used it" only.** The prompt allows listing learnable skills flagged [CONFIRM]. The app lists one only when she confirms she has used it; every suggestion feeds Today's "Skills to build" (derived from the last 14 days of tailoring, no new table).
 - **Volume and freshness.** 10/day × 7 days = 70/week (migration 0012 moves rows still on the old default of 6 days). Postings over 14 days aren't scored (was 30); in the shortlist, under 72 hours breaks ties ahead of remote.
 - **Not built yet (Phase 5):** daily check-in format, weekly review, interview prep, portfolio ideas, hour tracking and the project overflow. The modules are already in the prompt and `mentorPromptFor` has slots for them.
+
+
+### Recruiter note removed; cheaper calls
+- **Why the note went.** It was a Sonnet call (with thinking) on every application, Tier B included, for text most forms never ask for. Tier B now costs nothing to prepare and Tier A costs one call (tailoring). Optional "cover letter / additional information" boxes stay empty; required ones go to the answer writer like any other question. The `recruiter_note` and `note_basis` columns stay in the database, unused, so old rows and migrations remain valid and nothing is deleted.
+- **One cached prompt for every Sonnet call.** Tailoring, answers, chat and follow-up used to each send their own copy of the mentor prompt with different filler text, so each paid to write its own cache entry. They now share one identical first block (`sharedSystem`), marked for caching, so after the first call in five minutes the others read it at a tenth of the price.
+- **Smaller prompts.** Per-job calls drop the time budget, tone and quality-check sections, and unused slots (`tracker_state`, `networking_summary`, `current_resume` on scoring) are removed instead of sent as "(Not used)".
+- **Fewer drafting calls on forms.** The answer writer drafts required fields and optional essay boxes only. Other optional fields are left for her.
+- **Not changed, on purpose.** Effort levels and models stay as they are until there's usage data on what each call costs; the by-purpose spend query is in the reply that introduced this.

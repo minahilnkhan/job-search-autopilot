@@ -14,7 +14,6 @@ import { assertTransition } from "../domain/applicationStatus";
 import type { InventoryFacts } from "../domain/inventory";
 import type { Renderer } from "../render/renderer";
 import type { Tailor } from "../llm/tailor";
-import type { NoteWriter } from "../llm/note";
 import { ScoreError } from "../llm/scoreJob";
 import { accountProblem } from "../llm/errors";
 import { ConflictError, NotFoundError, getJob } from "./jobs";
@@ -22,7 +21,6 @@ import { getSettings, localDate } from "./settings";
 import { recordUsage } from "./usage";
 import { getBaseRow, resumeCheckLines, withRenderIssues } from "./resumes";
 import type {
-  NoteBasis,
   Answer,
   ApplicationDetail,
   ApplicationStatus,
@@ -33,7 +31,6 @@ import type {
 
 export type PrepDeps = {
   getTailor: (s: Settings) => { tailor: Tailor } | { unavailable: string };
-  getNoteWriter?: (s: Settings) => { writer: NoteWriter } | { unavailable: string };
   renderer: Renderer;
   facts: () => InventoryFacts;
   generatedDir?: string;
@@ -80,7 +77,7 @@ export async function finalizeApplication(db: DB, id: number, deps: PrepDeps, no
   const version = db.select().from(resumeVersions).where(eq(resumeVersions.id, app.resumeVersionId)).get()!;
 
   const truth = runTruthCheck(
-    { lines: [...resumeCheckLines(version.content), ...checkableAnswers(app.answers ?? [])], recruiterNote: app.recruiterNote },
+    { lines: [...resumeCheckLines(version.content), ...checkableAnswers(app.answers ?? [])] },
     deps.facts(),
     now
   );
@@ -101,86 +98,6 @@ export async function finalizeApplication(db: DB, id: number, deps: PrepDeps, no
   if (app.status === "draft" && passes) status = "ready_for_review";
   if (app.status === "ready_for_review" && !passes) status = "draft";
   db.update(applications).set({ truthReport: report, status, lastActivityAt: now }).where(eq(applications.id, id)).run();
-}
-
-async function draftNote(
-  db: DB,
-  args: {
-    jobId: number;
-    companyName: string;
-    title: string;
-    description: string;
-    content: import("../../../shared/types").ResumeContent;
-    currentNote?: string | null;
-    instructions?: string | null;
-  },
-  settings: Settings,
-  deps: PrepDeps,
-  now: Date
-): Promise<{ note: string; basis: NoteBasis } | { problem: string }> {
-  const w = deps.getNoteWriter?.(settings);
-  if (!w) return { problem: "note writing isn't set up" };
-  if ("unavailable" in w) return { problem: w.unavailable };
-  try {
-    const company = db.select({ notes: companies.notes }).from(companies).innerJoin(jobs, eq(jobs.companyId, companies.id)).where(eq(jobs.id, args.jobId)).get();
-    const r = await w.writer({
-      companyName: args.companyName,
-      title: args.title,
-      description: args.description,
-      resumeText: serializeResume(args.content),
-      companyNotes: company?.notes ?? null,
-      currentNote: args.currentNote ?? null,
-      instructions: args.instructions ?? null,
-    });
-    recordUsage(db, { purpose: "note", model: r.model, usage: r.usage, jobId: args.jobId, now });
-    return { note: r.note, basis: r.basis };
-  } catch (err) {
-    if (err instanceof ScoreError && err.usage) recordUsage(db, { purpose: "note", model: settings.models.tailoring, usage: err.usage, jobId: args.jobId, now });
-    return { problem: accountProblem(err) ?? (err as Error).message };
-  }
-}
-
-/**
- * "Suggest an edit": rewrite the note the way you describe. Returns a proposal
- * with its Truth Check result; nothing is saved until you press Use this.
- */
-export async function suggestNote(db: DB, id: number, instructions: string, currentNote: string | null, deps: PrepDeps, now = new Date()) {
-  loadEditable(db, id);
-  const detail = getApplication(db, id);
-  const n = await draftNote(
-    db,
-    {
-      jobId: detail.jobId,
-      companyName: detail.companyName,
-      title: detail.jobTitle,
-      description: detail.job.description,
-      content: detail.resume,
-      currentNote: currentNote ?? detail.recruiterNote,
-      instructions,
-    },
-    getSettings(db),
-    deps,
-    now
-  );
-  if ("problem" in n) throw new ConflictError(`Couldn't rewrite the note: ${n.problem}`);
-  const issues = runTruthCheck({ lines: [], recruiterNote: n.note }, deps.facts()).issues.filter((i) => i.severity === "fail");
-  return { note: n.note, basis: n.basis, issues: issues.map((i) => i.message) };
-}
-
-/** "Write it again": a fresh recruiter note, then the usual re-check. */
-export async function redraftNote(db: DB, id: number, deps: PrepDeps, now = new Date()) {
-  const app = loadEditable(db, id);
-  const detail = getApplication(db, id);
-  const n = await draftNote(
-    db,
-    { jobId: app.jobId, companyName: detail.companyName, title: detail.jobTitle, description: detail.job.description, content: detail.resume },
-    getSettings(db),
-    deps,
-    now
-  );
-  if ("problem" in n) throw new ConflictError(`Couldn't write a note: ${n.problem}`);
-  db.update(applications).set({ noteBasis: n.basis }).where(eq(applications.id, id)).run();
-  return editApplication(db, id, { recruiterNote: n.note }, deps, now);
 }
 
 /**
@@ -227,8 +144,6 @@ export async function prepareApplication(db: DB, jobId: number, deps: PrepDeps, 
   const notes: string[] = [];
   let content = base.content;
   let changes: ResumeChange[] = [];
-  let recruiterNote: string | null = null;
-  let noteBasis: NoteBasis | null = null;
   let generated: Answer[] = [];
   let tailoring: AppRow["tailoring"] = null;
 
@@ -268,14 +183,6 @@ export async function prepareApplication(db: DB, jobId: number, deps: PrepDeps, 
     }
   }
 
-  // Every application gets a recruiter note you can edit, from one writer
-  // with one brief (llm/note.ts), whatever the tier.
-  {
-    const n = await draftNote(db, { jobId, companyName: job.companyName, title: job.title, description: job.description, content }, settings, deps, now);
-    if ("note" in n) ({ note: recruiterNote, basis: noteBasis } = n);
-    else notes.push(`No recruiter note yet (${n.problem}). Use "Write a note" below.`);
-  }
-
   const answers: Answer[] = [
     ...generated,
     ...settings.standardAnswers.map((a) => ({ ...a, source: "standard" as const })),
@@ -285,7 +192,7 @@ export async function prepareApplication(db: DB, jobId: number, deps: PrepDeps, 
   const version = db.insert(resumeVersions).values({ baseType, parentId: base.id, jobId, content, diffFromBase: changes }).returning().get();
   const app = db
     .insert(applications)
-    .values({ jobId, tier, resumeVersionId: version.id, recruiterNote, noteBasis, answers, status: "draft", prepNotes: notes, tailoring, lastActivityAt: now })
+    .values({ jobId, tier, resumeVersionId: version.id, answers, status: "draft", prepNotes: notes, tailoring, lastActivityAt: now })
     .returning()
     .get();
   db.update(jobs).set({ status: "shortlisted" }).where(eq(jobs.id, jobId)).run();
@@ -356,8 +263,6 @@ export function getApplication(db: DB, id: number): ApplicationDetail {
     resume: version.content,
     resumeText: serializeResume(version.content),
     changes: version.diffFromBase ?? [],
-    recruiterNote: row.app.recruiterNote,
-    noteBasis: row.app.noteBasis ?? null,
     prefillReport: row.app.prefillReport ?? null,
     applyUrl: applyTarget(row.job, row.companyToken)?.url ?? null,
     submittedAt: row.app.submittedAt?.getTime() ?? null,
@@ -367,7 +272,7 @@ export function getApplication(db: DB, id: number): ApplicationDetail {
     pdfPages: version.pdfPages,
     hasPdf: !!version.filePathPdf && fs.existsSync(version.filePathPdf),
     hasDocx: !!version.filePathDocx && fs.existsSync(version.filePathDocx),
-    prepNotes: row.app.prepNotes ?? [],
+    prepNotes: (row.app.prepNotes ?? []).filter((n) => !/recruiter note/i.test(n)), // old rows may mention the removed note
     reviewReason: row.app.reviewReason,
     tailoring: row.app.tailoring ?? null,
   };
@@ -394,8 +299,6 @@ function loadEditable(db: DB, id: number) {
 }
 
 export type ApplicationPatch = {
-  recruiterNote?: string | null;
-  noteBasis?: NoteBasis | null;
   contact?: string;
   answers?: { index: number; answer: string }[];
   lines?: { id: string; text: string }[];
@@ -448,8 +351,6 @@ export async function editApplication(db: DB, id: number, patch: ApplicationPatc
   }
   db.update(applications)
     .set({
-      recruiterNote: patch.recruiterNote !== undefined ? patch.recruiterNote?.trim() || null : app.recruiterNote,
-      ...(patch.noteBasis !== undefined ? { noteBasis: patch.noteBasis } : {}),
       answers,
       truthOverride: null,
       lastActivityAt: now,

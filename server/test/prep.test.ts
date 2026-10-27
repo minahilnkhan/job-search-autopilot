@@ -142,7 +142,7 @@ describe("Phase 3 acceptance: a planted DO NOT CLAIM line is blocked with the re
 });
 
 describe("preparing", () => {
-  it("Tier A: tailors, logs cost, writes a note and answers, keeps work-auth answers fixed", async () => {
+  it("Tier A: tailors, logs cost, writes answers, keeps work-auth answers fixed", async () => {
     const { tailor, calls } = fakeTailor({ lineEdits: [{ id: "0.0.0", after: "Owned the Word Splitter LLM feature end to end", reason: "LLM" }] });
     setup({ getTailor: () => ({ tailor }) });
     await saveBases();
@@ -152,31 +152,29 @@ describe("preparing", () => {
     expect(calls[0]!.baseResume).toContain("[0.0.0] Owned the Word Splitter feature end to end");
     expect(body).toMatchObject({ status: "ready_for_review", tier: "A", baseType: "fde" });
     expect(body.changes).toEqual([expect.objectContaining({ before: "Owned the Word Splitter feature end to end", after: "Owned the Word Splitter LLM feature end to end" })]);
-    expect(body.recruiterNote).toContain("Claude pipeline");
-    expect(body.noteBasis).toMatchObject({ companyValue: "Customer focus" });
+    expect(body).not.toHaveProperty("recruiterNote"); // no recruiter note any more
     const sources = body.answers.map((a: { source: string }) => a.source);
     expect(sources.filter((s: string) => s === "generated")).toHaveLength(2);
     expect(body.answers.filter((a: { source: string }) => a.source === "fixed")).toEqual([
       expect.objectContaining({ answer: "Yes", question: expect.stringContaining("authorized") }),
       expect.objectContaining({ answer: "Yes", question: expect.stringContaining("sponsorship") }),
     ]);
-    expect(db.select().from(apiUsage).all()).toEqual([
-      expect.objectContaining({ purpose: "tailoring", model: "claude-sonnet-5-5" }),
-      expect.objectContaining({ purpose: "note", model: "claude-sonnet-5-5" }),
-    ]);
+    // One model call per application: tailoring. Nothing else is spent on Tier A before you open it.
+    expect(db.select().from(apiUsage).all()).toEqual([expect.objectContaining({ purpose: "tailoring", model: "claude-sonnet-5-5" })]);
     const job = db.select().from(jobs).where(eq(jobs.id, jobId)).get()!;
     expect(job.status).toBe("shortlisted");
   });
 
   it("Tier B: base resume and standard answers, no tailoring; placeholders in standard answers block it", async () => {
     const { tailor, calls } = fakeTailor();
-    setup({ getTailor: () => ({ tailor }), getNoteWriter: undefined });
+    setup({ getTailor: () => ({ tailor }) });
     db.update(settings).set({ standardAnswers: DEFAULT_SETTINGS.standardAnswers }).run();
     await saveBases();
     const jobId = await addJob("Software Engineer", "B");
     const { body } = await req("POST", "/api/applications", { jobId });
     expect(calls).toHaveLength(0);
-    expect(body).toMatchObject({ tier: "B", baseType: "swe", changes: [], recruiterNote: null });
+    expect(body).toMatchObject({ tier: "B", baseType: "swe", changes: [] });
+    expect(db.select().from(apiUsage).all()).toEqual([]); // Tier B costs nothing to prepare
     // The default standard answers include "[your start date or notice period]".
     expect(body.status).toBe("draft");
     const placeholder = body.truth.issues.find((i: { kind: string }) => i.kind === "placeholder");
@@ -266,7 +264,7 @@ describe("override, reject, snooze", () => {
     expect((await req("POST", `/api/applications/${a.id}/override`, { reason: "ok" })).status).toBe(409);
     const o = await req("POST", `/api/applications/${a.id}/override`, { reason: "12 teams is from my manager's email; adding it to the inventory." });
     expect(o.body).toMatchObject({ status: "ready_for_review", truthPass: false, truthOverride: { reason: expect.stringContaining("12 teams") } });
-    const edited = await req("PATCH", `/api/applications/${a.id}`, { recruiterNote: "Short note." });
+    const edited = await req("PATCH", `/api/applications/${a.id}`, { answers: [{ index: 0, answer: "Their careers page, edited." }] });
     expect(edited.body).toMatchObject({ truthOverride: null, status: "draft" });
   });
 
@@ -297,7 +295,7 @@ describe("override, reject, snooze", () => {
     const a = (await req("POST", "/api/applications", { jobId })).body;
     expect((await req("POST", `/api/applications/${a.id}/approve`)).body.status).toBe("approved");
     expect((await req("POST", `/api/applications/${a.id}/approve`)).status).toBe(409);
-    expect((await req("PATCH", `/api/applications/${a.id}`, { recruiterNote: "x" })).status).toBe(409);
+    expect((await req("PATCH", `/api/applications/${a.id}`, { answers: [{ index: 0, answer: "x" }] })).status).toBe(409);
     const row = db.select().from(applications).where(eq(applications.id, a.id)).get()!;
     expect(row.approvedAt).not.toBeNull();
   });
@@ -311,22 +309,6 @@ describe("base resume first, notes for every application, restart, background pr
     expect(res.status).toBe(409);
     expect(res.body.error).toContain("FDE base resume has 1 problem");
     expect(res.body.error).toContain("Fill in [email]");
-  });
-
-  it("Tier B gets a recruiter note too; 'Write a note' redrafts it", async () => {
-    let n = 0;
-    setup({
-      getNoteWriter: () => ({
-        writer: async () => ({ note: `Note number ${++n} about the Word Splitter feature.`, basis: { companyValue: `Value ${n}`, valueSource: "", story: "s", standout: "x" }, model: "claude-sonnet-5-5", usage: { inputTokens: 1, outputTokens: 1, cacheReadTokens: 0, cacheWriteTokens: 0 } }),
-      }),
-    });
-    await saveBases();
-    const jobId = await addJob("Software Engineer", "B");
-    const a = (await req("POST", "/api/applications", { jobId })).body;
-    expect(a.recruiterNote).toBe("Note number 1 about the Word Splitter feature.");
-    const again = await req("POST", `/api/applications/${a.id}/note`);
-    expect(again.body.recruiterNote).toBe("Note number 2 about the Word Splitter feature.");
-    expect(again.body.noteBasis.companyValue).toBe("Value 2");
   });
 
   it("the contact line can be fixed right in the application", async () => {
@@ -354,31 +336,6 @@ describe("base resume first, notes for every application, restart, background pr
     expect(res.body.resume.sections.map((s: { title: string }) => s.title)).toEqual(["Experience", "Education"]);
     expect(res.body.changes.filter((c: { after: string }) => c.after === "(removed)")).toHaveLength(3);
     expect((await req("PATCH", `/api/applications/${a.id}`, { lines: [{ id: "contact", text: "" }] })).status).toBe(409);
-  });
-
-  it("Suggest an edit: rewrites the note the way you say, shows its Truth Check, and saves only when you use it", async () => {
-    const seen: { currentNote?: string | null; instructions?: string | null }[] = [];
-    setup({
-      getNoteWriter: () => ({
-        writer: async (input) => {
-          seen.push({ currentNote: input.currentNote, instructions: input.instructions });
-          const note = input.instructions?.includes("latency") ? "I cut search latency 60% at Acme Learning." : "Shorter note about the Word Splitter feature.";
-          return { note, basis: { companyValue: "Speed", valueSource: "", story: "Word Splitter", standout: "Teachers" }, model: "claude-sonnet-5-5", usage: { inputTokens: 1, outputTokens: 1, cacheReadTokens: 0, cacheWriteTokens: 0 } };
-        },
-      }),
-    });
-    await saveBases();
-    const jobId = await addJob("Software Engineer", "B");
-    const a = (await req("POST", "/api/applications", { jobId })).body;
-    const before = a.recruiterNote;
-    const s1 = (await req("POST", `/api/applications/${a.id}/note/suggest`, { instructions: "Make it shorter", currentNote: "My edited draft." })).body;
-    expect(seen.at(-1)).toEqual({ currentNote: "My edited draft.", instructions: "Make it shorter" });
-    expect(s1).toMatchObject({ note: "Shorter note about the Word Splitter feature.", issues: [] });
-    expect((await req("GET", `/api/applications/${a.id}`)).body.recruiterNote).toBe(before); // not saved yet
-    const s2 = (await req("POST", `/api/applications/${a.id}/note/suggest`, { instructions: "add my latency win" })).body;
-    expect(s2.issues.join(" ")).toMatch(/DO NOT CLAIM|inventory/);
-    const used = (await req("PATCH", `/api/applications/${a.id}`, { recruiterNote: s1.note, noteBasis: s1.basis })).body;
-    expect(used).toMatchObject({ recruiterNote: s1.note, noteBasis: { companyValue: "Speed" } });
   });
 
   it("restart rebuilds from the current base and closes the old application", async () => {

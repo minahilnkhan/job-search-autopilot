@@ -1,7 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { z } from "zod";
 import type { TokenUsage } from "./pricing";
-import { fillMentorPrompt, mentorPromptFor, type MentorContext } from "./context";
+import { sharedSystem, type MentorContext } from "./context";
 import { ScoreError } from "./scoreJob";
 
 // The extension's chat: you ask for a change ("shorten Why Anthropic to two
@@ -17,14 +17,12 @@ export type ChatInput = {
   resumeLines: string; // "[id] text" per line
   answers: { question: string; answer: string }[];
   formQuestions: string[]; // questions on the open form, even if not prepared yet
-  recruiterNote: string | null;
   history: ChatTurn[];
   message: string;
 };
 export type ChatEdits = {
   lines: { id: string; text: string }[]; // text "" deletes the line
   answers: { question: string; answer: string }[];
-  recruiterNote: string; // "" = no change
 };
 export type ChatResult = { reply: string; edits: ChatEdits; usage: TokenUsage; model: string };
 export type ChatWriter = (input: ChatInput) => Promise<ChatResult>;
@@ -38,7 +36,7 @@ const SCHEMA = {
     edits: {
       type: "object",
       additionalProperties: false,
-      required: ["lines", "answers", "recruiterNote"],
+      required: ["lines", "answers"],
       properties: {
         lines: {
           type: "array",
@@ -48,7 +46,6 @@ const SCHEMA = {
           type: "array",
           items: { type: "object", additionalProperties: false, required: ["question", "answer"], properties: { question: { type: "string", description: "Exactly as listed" }, answer: { type: "string" } } },
         },
-        recruiterNote: { type: "string", description: "The whole new note, or empty for no change" },
       },
     },
   },
@@ -59,7 +56,6 @@ const resultSchema = z.object({
   edits: z.object({
     lines: z.array(z.object({ id: z.string(), text: z.string() })),
     answers: z.array(z.object({ question: z.string(), answer: z.string() })),
-    recruiterNote: z.string(),
   }),
 });
 
@@ -68,7 +64,6 @@ You're helping the candidate adjust one job application while she fills in the f
 
 - Resume lines: refer to them by the [id] shown in <resume>; give the whole new line. Empty text deletes a line. Keep one page in mind.
 - Answers: use the question exactly as listed in <answers> or <form_questions>. Never change work-authorization or sponsorship answers; they're fixed in her settings.
-- Recruiter note: the whole new note (under 99 words), or empty for no change.
 - Use only facts in <candidate_inventory> and the resume. Never anything on the DO NOT CLAIM list, and no numbers that aren't in the inventory, even if she asks. If she asks for something you can't truthfully write, make no edit and say what you can write instead.
 - Facts only she knows (salary, start date, a referral): if she gives them in her message, use them as she said; don't invent them.
 - Keep her real ownership level ("integrated" for work a senior engineer designed). No banned words (spearheaded, leveraged, utilized, passionate, robust, seamless, cutting-edge, dynamic, results-driven, synergy, "responsible for").
@@ -89,24 +84,9 @@ function usageOf(msg: Anthropic.Message): TokenUsage {
   };
 }
 
-function systemFor(context: MentorContext, instructions: string): Anthropic.TextBlockParam[] {
-  return [
-    {
-      type: "text",
-      text: fillMentorPrompt(mentorPromptFor(context.mentorPrompt, "resume"), {
-        candidate_inventory: context.inventory,
-        current_resume: "(The resume is in the message.)",
-        tracker_state: "(Not used.)",
-        networking_summary: "(Not used.)",
-      }),
-    },
-    { type: "text", text: instructions, cache_control: { type: "ephemeral" } },
-  ];
-}
-
 export function makeAnthropicChat(opts: { apiKey: string; model: string; context: MentorContext; fetch?: typeof fetch }): ChatWriter {
   const client = new Anthropic({ apiKey: opts.apiKey, maxRetries: 3, fetch: opts.fetch });
-  const system = systemFor(opts.context, INSTRUCTIONS);
+  const system = sharedSystem(opts.context, INSTRUCTIONS);
   return async (input) => {
     const history = input.history
       .slice(-10)
@@ -123,7 +103,6 @@ export function makeAnthropicChat(opts: { apiKey: string; model: string; context
             `<resume>\n${input.resumeLines}\n</resume>`,
             `<answers>\n${input.answers.map((a) => `Q: ${a.question}\nA: ${a.answer}`).join("\n\n") || "(none)"}\n</answers>`,
             `<form_questions>\n${input.formQuestions.join("\n") || "(none)"}\n</form_questions>`,
-            `<recruiter_note>\n${input.recruiterNote ?? "(none)"}\n</recruiter_note>`,
             `<job_posting>\nCompany: ${input.companyName}\nTitle: ${input.title}\n\n${input.description.slice(0, 10_000)}\n</job_posting>`,
             `<history>\n${history || "(none)"}\n</history>`,
             `<message>\n${input.message}\n</message>`,
@@ -141,11 +120,11 @@ export function makeAnthropicChat(opts: { apiKey: string; model: string; context
   };
 }
 
-export type FollowUpWriter = (input: { companyName: string; title: string; recruiterNote: string | null; daysSince: number }) => Promise<{ text: string; usage: TokenUsage; model: string }>;
+export type FollowUpWriter = (input: { companyName: string; title: string; daysSince: number }) => Promise<{ text: string; usage: TokenUsage; model: string }>;
 
 export function makeAnthropicFollowUp(opts: { apiKey: string; model: string; context: MentorContext; fetch?: typeof fetch }): FollowUpWriter {
   const client = new Anthropic({ apiKey: opts.apiKey, maxRetries: 3, fetch: opts.fetch });
-  const system = systemFor(opts.context, FOLLOW_UP);
+  const system = sharedSystem(opts.context, FOLLOW_UP);
   return async (input) => {
     const msg = await client.messages.create({
       model: opts.model,
@@ -154,7 +133,7 @@ export function makeAnthropicFollowUp(opts: { apiKey: string; model: string; con
       messages: [
         {
           role: "user",
-          content: `<application>\nCompany: ${input.companyName}\nRole: ${input.title}\nApplied: ${input.daysSince} days ago\nNote sent with it: ${input.recruiterNote ?? "(none)"}\n</application>`,
+          content: `<application>\nCompany: ${input.companyName}\nRole: ${input.title}\nApplied: ${input.daysSince} days ago\n</application>`,
         },
       ],
       output_config: { effort: "low" },

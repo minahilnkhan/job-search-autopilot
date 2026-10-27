@@ -95,7 +95,7 @@ export function extensionRoutes(app: FastifyInstance, db: DB, deps: SubmitDeps |
       });
       scope.post("/applications/:id/chat/apply", async (req) => {
         const { edits } = z
-          .object({ edits: z.array(z.object({ kind: z.enum(["line", "answer", "note"]), key: z.string().max(500), after: z.string().max(8000) })).min(1).max(30) })
+          .object({ edits: z.array(z.object({ kind: z.enum(["line", "answer"]), key: z.string().max(500), after: z.string().max(8000) })).min(1).max(30) })
           .parse(req.body);
         const r = await applyChatEdits(db, idParam.parse(req.params).id, prep, edits);
         return { status: r.application.status, resumeChanged: r.resumeChanged, message: r.message };

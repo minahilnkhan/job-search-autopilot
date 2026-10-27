@@ -11,7 +11,6 @@ import type {
   FilterReason,
   Job,
   JobListItem,
-  NoteBasis,
   PipelineProgress,
   PipelineRun,
   Settings,
@@ -81,9 +80,6 @@ export const api = {
     request<{ jobId: number; jobTitle: string; companyName: string; startedAt: number; error: string | null }[]>("GET", "/api/applications/preparing"),
   dismissPreparing: (jobId: number) => request<{ ok: boolean }>("DELETE", `/api/applications/preparing/${jobId}`),
   refillShortlist: () => request<Shortlist | null>("POST", "/api/shortlist/refill", {}),
-  suggestNote: (id: number, instructions: string, currentNote: string | null) =>
-    request<{ note: string; basis: NoteBasis; issues: string[] }>("POST", `/api/applications/${id}/note/suggest`, { instructions, currentNote }),
-  redraftNote: (id: number) => request<ApplicationDetail>("POST", `/api/applications/${id}/note`, {}),
   answerTailoring: (id: number, body: { kind: "assumption" | "skill"; index: number; confirmed: boolean; answer?: string; text?: string }) =>
     request<ApplicationDetail>("POST", `/api/applications/${id}/tailoring/answer`, body),
   skillsToBuild: () => request<{ skill: string; count: number; companies: string[]; listed: boolean }[]>("GET", "/api/skills-to-build"),
@@ -93,7 +89,7 @@ export const api = {
   application: (id: number) => request<ApplicationDetail>("GET", `/api/applications/${id}`),
   editApplication: (
     id: number,
-    body: { recruiterNote?: string | null; noteBasis?: NoteBasis | null; contact?: string; answers?: { index: number; answer: string }[]; lines?: { id: string; text: string }[] }
+    body: { contact?: string; answers?: { index: number; answer: string }[]; lines?: { id: string; text: string }[] }
   ) => request<ApplicationDetail>("PATCH", `/api/applications/${id}`, body),
   regenerate: (id: number) => request<ApplicationDetail>("POST", `/api/applications/${id}/regenerate`, {}),
   override: (id: number, reason: string) => request<ApplicationDetail>("POST", `/api/applications/${id}/override`, { reason }),

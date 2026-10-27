@@ -106,7 +106,7 @@ export async function openAndPrefill(db: DB, id: number, deps: SubmitDeps): Prom
     db.update(applications).set({ prefillReport: report, lastActivityAt: new Date() }).where(eq(applications.id, id)).run();
   };
 
-  const values = { profile: settings.profile, answers: app.answers, recruiterNote: app.recruiterNote, jobOutsideUS: isOutsideUS(app.job.location), resumeFileName: path.basename(resumePath) };
+  const values = { profile: settings.profile, answers: app.answers, jobOutsideUS: isOutsideUS(app.job.location), resumeFileName: path.basename(resumePath) };
   const askFor = (label: string, required: boolean, question: string, draft: string | null, i: number): SubmitAsk => ({
     id: `ask-${i + 1}`,
     label: clean(label),
@@ -256,7 +256,6 @@ function questionHandler(db: DB, id: number, deps: SubmitDeps, settings: Setting
         title: app.jobTitle,
         description: app.job.description,
         resumeText: app.resumeText,
-        recruiterNote: app.recruiterNote,
         questions: controls.map((c) => ({ id: c.id, label: clean(c.label), kind: c.kind, options: c.options.map((o) => o.text), required: c.required })),
       });
       recordUsage(db, { purpose: "answers", model: result.model, usage: result.usage, jobId: app.jobId, now: new Date() });
@@ -460,7 +459,7 @@ export function extensionPayload(db: DB, id: number) {
     applicationId: id,
     jobTitle: app.jobTitle,
     companyName: app.companyName,
-    values: { profile: settings.profile, answers: app.answers, recruiterNote: app.recruiterNote, jobOutsideUS: isOutsideUS(app.job.location), resumeFileName: f.filename },
+    values: { profile: settings.profile, answers: app.answers, jobOutsideUS: isOutsideUS(app.job.location), resumeFileName: f.filename },
     resume: { fileName: f.filename, base64: fs.readFileSync(f.path).toString("base64") },
   };
 }

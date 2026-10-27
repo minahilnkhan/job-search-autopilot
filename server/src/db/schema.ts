@@ -10,7 +10,6 @@ import {
 } from "drizzle-orm/sqlite-core";
 import type {
   TailoringInfo,
-  NoteBasis,
   PrefillReport,
   Answer,
   ExtractedFields,
@@ -132,6 +131,7 @@ export const applications = sqliteTable(
       .references(() => jobs.id),
     tier: text("tier", { enum: ["A", "B"] }),
     resumeVersionId: integer("resume_version_id").references(() => resumeVersions.id),
+    // Unused since the recruiter note was removed. Kept so old rows and the migrations stay valid.
     recruiterNote: text("recruiter_note"),
     answers: text("answers", { mode: "json" }).$type<Answer[]>(),
     status: text("status", { enum: APPLICATION_STATUSES }).notNull().default("draft"),
@@ -146,8 +146,7 @@ export const applications = sqliteTable(
     snoozedUntil: text("snoozed_until"), // YYYY-MM-DD
     prepNotes: text("prep_notes", { mode: "json" }).$type<string[]>(),
     tailoring: text("tailoring", { mode: "json" }).$type<TailoringInfo>(),
-    // What the recruiter note was built around, so you can judge and edit it.
-    noteBasis: text("note_basis", { mode: "json" }).$type<NoteBasis>(),
+    noteBasis: text("note_basis", { mode: "json" }).$type<unknown>(),
     // Phase 4: what the assisted-submit prefill filled and left for you.
     prefillReport: text("prefill_report", { mode: "json" }).$type<PrefillReport>(),
     createdAt: createdAt(),

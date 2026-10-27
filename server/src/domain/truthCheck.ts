@@ -7,8 +7,6 @@ import { extractNumbers, numberKey, type InventoryFacts } from "./inventory";
 
 export type CheckLine = { where: string; text: string; lineId?: string; checkNumbers?: boolean };
 
-export const NOTE_MAX_WORDS = 100;
-
 // From the mentor prompt's resume rules. Style, not truth, so these only warn.
 const BANNED = ["spearheaded", "leveraged", "utilized", "passionate", "robust", "seamless", "cutting-edge", "dynamic", "results-driven", "synergy", "responsible for"];
 
@@ -101,18 +99,7 @@ function dedupe(issues: TruthIssue[]): TruthIssue[] {
   });
 }
 
-export function runTruthCheck(
-  input: { lines: CheckLine[]; recruiterNote?: string | null },
-  facts: InventoryFacts,
-  now = new Date()
-): TruthReport {
+export function runTruthCheck(input: { lines: CheckLine[] }, facts: InventoryFacts, now = new Date()): TruthReport {
   const issues = input.lines.flatMap((l) => checkLine(l, facts));
-  if (input.recruiterNote) {
-    issues.push(...checkLine({ where: "Recruiter note", text: input.recruiterNote }, facts));
-    const words = wordCount(input.recruiterNote);
-    if (words >= NOTE_MAX_WORDS) {
-      issues.push({ kind: "length", severity: "fail", where: "Recruiter note", text: input.recruiterNote, message: `${words} words; keep it under ${NOTE_MAX_WORDS}.` });
-    }
-  }
   return { pass: !issues.some((i) => i.severity === "fail"), issues, checkedAt: now.getTime() };
 }

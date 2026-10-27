@@ -97,17 +97,6 @@ describe("other checks", () => {
     expect(check("Chicago, IL | [email]").issues[0]).toMatchObject({ kind: "placeholder", message: "Fill in [email]." });
   });
 
-  it("caps the recruiter note under 100 words", () => {
-    const long = Array.from({ length: 100 }, () => "word").join(" ");
-    const r = runTruthCheck({ lines: [], recruiterNote: long }, facts);
-    expect(r.issues.find((i) => i.kind === "length")?.message).toBe("100 words; keep it under 100.");
-    expect(runTruthCheck({ lines: [], recruiterNote: "Short and true." }, facts).pass).toBe(true);
-  });
-
-  it("checks the recruiter note for claims too", () => {
-    expect(runTruthCheck({ lines: [], recruiterNote: "I cut latency 60% at Acme." }, facts).pass).toBe(false);
-  });
-
   it("banned style words only warn", () => {
     const r = check("Leveraged Claude to build the Word Splitter");
     expect(r.pass).toBe(true);

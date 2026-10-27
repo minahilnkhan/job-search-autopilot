@@ -3,7 +3,6 @@ import type { ScorerFactory } from "../services/pipeline";
 import { loadMentorContext, MissingContextError } from "./context";
 import { makeAnthropicScorer } from "./scoreJob";
 import { makeAnthropicTailor, type Tailor } from "./tailor";
-import { makeAnthropicNoteWriter, type NoteWriter } from "./note";
 import { makeAnthropicAnswerWriter, type AnswerWriter } from "./answers";
 import { makeAnthropicChat, makeAnthropicFollowUp, type ChatWriter, type FollowUpWriter } from "./chat";
 import type { Settings } from "../../../shared/types";
@@ -28,18 +27,6 @@ export function anthropicTailorFactory(settings: Settings): { tailor: Tailor } |
   try {
     const context = loadMentorContext();
     return { tailor: makeAnthropicTailor({ apiKey: config.anthropicApiKey, model: settings.models.tailoring, context }) };
-  } catch (err) {
-    if (err instanceof MissingContextError) return { unavailable: err.message };
-    throw err;
-  }
-}
-
-/** Recruiter-note writer (uses the tailoring model at low effort), or why it can't run. */
-export function anthropicNoteFactory(settings: Settings): { writer: NoteWriter } | { unavailable: string } {
-  if (!config.anthropicApiKey) return { unavailable: "no ANTHROPIC_API_KEY in .env" };
-  try {
-    const context = loadMentorContext();
-    return { writer: makeAnthropicNoteWriter({ apiKey: config.anthropicApiKey, model: settings.models.tailoring, context }) };
   } catch (err) {
     if (err instanceof MissingContextError) return { unavailable: err.message };
     throw err;
