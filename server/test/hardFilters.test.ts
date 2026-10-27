@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { runHardFilters, type FilterInput } from "../src/domain/hardFilters";
+import { isOutsideUS, runHardFilters, type FilterInput } from "../src/domain/hardFilters";
 import { fields, NO_EMPLOYMENT_FLAGS } from "./helpers";
 
 const base = (overrides: Partial<FilterInput> = {}): FilterInput => ({
@@ -76,6 +76,16 @@ describe("runHardFilters", () => {
 
     it.each(["London, UK", "Toronto, Canada", "Bengaluru, IN", "Remote - EMEA", "Berlin"])("non-US fails: %s", (location) => {
       expect(codes(base({ location })).fails).toContain("location_non_us");
+    });
+
+    it("countries you've added in Settings pass with a visa warning instead of failing", () => {
+      const r = runHardFilters({ ...base({ location: "London, UK" }), otherCountries: ["United Kingdom"] });
+      expect(r.pass).toBe(true);
+      expect(r.reasons).toEqual(expect.arrayContaining([expect.objectContaining({ code: "location_abroad", severity: "warn" })]));
+      expect(r.reasons.find((x) => x.code === "location_abroad")!.message).toContain("Skilled Worker");
+      expect(runHardFilters({ ...base({ location: "Berlin" }), otherCountries: ["United Kingdom"] }).pass).toBe(false);
+      expect(isOutsideUS("London, UK")).toBe(true);
+      expect(isOutsideUS("New York or London")).toBe(false);
     });
 
     it("multi-location with a US option passes", () => {

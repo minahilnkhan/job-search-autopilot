@@ -7,6 +7,7 @@ import type { DB } from "../db/client";
 import { applications, companies, jobs } from "../db/schema";
 import { assertTransition } from "../domain/applicationStatus";
 import { applyTarget } from "../submit/applyUrl";
+import { isOutsideUS } from "../domain/hardFilters";
 import { looksBlocked, looksSubmitted, siteKey } from "../submit/confirm";
 import type { OpenPage } from "../submit/browser";
 import { fillControl, prefillPage, readFormForCopy, type QuestionHandler } from "../submit/prefill";
@@ -105,7 +106,7 @@ export async function openAndPrefill(db: DB, id: number, deps: SubmitDeps): Prom
     db.update(applications).set({ prefillReport: report, lastActivityAt: new Date() }).where(eq(applications.id, id)).run();
   };
 
-  const values = { profile: settings.profile, answers: app.answers, recruiterNote: app.recruiterNote, resumeFileName: path.basename(resumePath) };
+  const values = { profile: settings.profile, answers: app.answers, recruiterNote: app.recruiterNote, jobOutsideUS: isOutsideUS(app.job.location), resumeFileName: path.basename(resumePath) };
   const askFor = (label: string, required: boolean, question: string, draft: string | null, i: number): SubmitAsk => ({
     id: `ask-${i + 1}`,
     label: clean(label),
@@ -459,7 +460,7 @@ export function extensionPayload(db: DB, id: number) {
     applicationId: id,
     jobTitle: app.jobTitle,
     companyName: app.companyName,
-    values: { profile: settings.profile, answers: app.answers, recruiterNote: app.recruiterNote, resumeFileName: f.filename },
+    values: { profile: settings.profile, answers: app.answers, recruiterNote: app.recruiterNote, jobOutsideUS: isOutsideUS(app.job.location), resumeFileName: f.filename },
     resume: { fileName: f.filename, base64: fs.readFileSync(f.path).toString("base64") },
   };
 }

@@ -210,3 +210,10 @@ Inspired by Stripe's calm, airy style, not copied: Inter instead of Stripe's lic
 
 ### Chat edits are proposals, checked in code, applied on your click
 The extension's Chat sends the request, the application (resume lines by id, answers, note, posting) and the form's questions to Sonnet, which returns edits. Code Truth-Checks each edit and drops the ones that fail, saying why; work-authorization answers can't be changed. Nothing changes until Apply. Applying to an approved application un-approves it, saves the edits, re-runs the Truth Check and the one-page check, and re-approves only if both pass; otherwise it lands in Needs a fix with the reason. The extension then types changed answers into the open form and re-attaches the resume if it changed. That keeps "nothing leaves without my approval": she approves the change by pressing Apply, and the checks still gate it.
+
+### Jobs abroad, and "Continue anyway"
+Location outside the US was a hard fail because STEM OPT only covers US employment. She wants UK jobs too, so Settings now has "Also open to jobs in" (United Kingdom by default): jobs in a listed country pass with a warning that she'd need that country's work visa (in the UK, usually employer-sponsored Skilled Worker). Other countries still fail, with the fix named in the message.
+
+Any failed filter can be bypassed per job with **Continue anyway** (stored as `jobs.filter_override`). The failing reasons stay listed and the badge says "Continued anyway"; re-filtering (edits, the startup re-check) keeps the override; Undo puts the filters back in charge.
+
+Her fixed work-authorization answers are about the US. On a job abroad, a question about another country's right to work (or a generic one) is never auto-answered: it goes to "fill these yourself". Answering "Yes" to "right to work in the UK" would be false.

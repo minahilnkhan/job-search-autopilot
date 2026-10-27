@@ -19,6 +19,8 @@ export type FilterInput = {
   };
   /** True for job-board postings: titles outside your target roles fail before any AI scoring. */
   requireTargetRole?: boolean;
+  /** Countries outside the US you'd work in (Settings). Jobs there pass with a visa warning instead of failing. */
+  otherCountries?: string[];
 };
 
 export type FilterResult = { pass: boolean; reasons: FilterReason[] };
@@ -47,7 +49,29 @@ const US_STATE_SUFFIX = new RegExp(`,\\s*(${US_STATES})\\b`); // case-sensitive
 const NON_US_LOCATION =
   /\b(canada|toronto|vancouver|montreal|mexico|brazil|argentina|colombia|latam|uk|united kingdom|england|london|ireland|dublin|germany|berlin|munich|france|paris|spain|madrid|barcelona|portugal|lisbon|netherlands|amsterdam|poland|warsaw|sweden|stockholm|switzerland|zurich|europe|emea|apac|india|bangalore|bengaluru|hyderabad|pune|singapore|japan|tokyo|korea|seoul|china|australia|sydney|melbourne|new zealand|israel|tel aviv|uae|dubai|philippines|pakistan)\b/i;
 
-function locationCheck(location: string | null, f: ExtractedFields): FilterReason | null {
+// Countries we can recognize from a location string, for "also open to jobs in…".
+const COUNTRIES: { name: string; re: RegExp; visa: string }[] = [
+  { name: "United Kingdom", re: /\b(uk|u\.k\.|united kingdom|great britain|britain|england|scotland|wales|northern ireland|london|manchester|edinburgh|glasgow|cambridge|oxford|bristol|leeds|birmingham|belfast)\b/i, visa: "a UK work visa, usually a Skilled Worker visa the employer sponsors" },
+  { name: "Ireland", re: /\b(ireland|dublin|cork)\b/i, visa: "an Irish employment permit the employer supports" },
+  { name: "Canada", re: /\b(canada|toronto|vancouver|montreal|ottawa|calgary)\b/i, visa: "a Canadian work permit" },
+  { name: "Germany", re: /\b(germany|berlin|munich|hamburg|frankfurt)\b/i, visa: "a German work visa or EU Blue Card" },
+  { name: "Netherlands", re: /\b(netherlands|amsterdam|rotterdam)\b/i, visa: "a Dutch highly skilled migrant permit the employer sponsors" },
+  { name: "Singapore", re: /\bsingapore\b/i, visa: "a Singapore Employment Pass" },
+];
+
+/** The non-US country a location names, if we recognize it. */
+export function countryOf(location: string | null): string | null {
+  const loc = location ?? "";
+  if (!NON_US_LOCATION.test(loc) || US_WORDS.test(loc)) return null;
+  return COUNTRIES.find((c) => c.re.test(loc))?.name ?? "outside the US";
+}
+
+/** True when the location is clearly outside the US (used to keep US-only work-auth answers off foreign forms). */
+export function isOutsideUS(location: string | null): boolean {
+  return countryOf(location) !== null;
+}
+
+function locationCheck(location: string | null, f: ExtractedFields, otherCountries: string[] = []): FilterReason | null {
   const loc = (location ?? "").trim();
   if (!loc) {
     if (f.remote && !f.remoteCountryStated) {
@@ -60,7 +84,21 @@ function locationCheck(location: string | null, f: ExtractedFields): FilterReaso
   const usWord = US_WORDS.test(loc);
   // A non-US place wins unless a clear US word is also there ("New York or London").
   if (nonUs && !usWord) {
-    return { code: "location_non_us", severity: "fail", message: `Location is outside the US: "${loc}".`, evidence: loc };
+    const country = COUNTRIES.find((c) => c.re.test(loc));
+    if (country && otherCountries.some((o) => o.trim().toLowerCase() === country.name.toLowerCase())) {
+      return {
+        code: "location_abroad",
+        severity: "warn",
+        message: `In ${country.name}. STEM OPT only covers US jobs, so you'd need ${country.visa}. Check that the posting offers sponsorship.`,
+        evidence: loc,
+      };
+    }
+    return {
+      code: "location_non_us",
+      severity: "fail",
+      message: `Location is outside the US: "${loc}". To apply to jobs there, add the country in Settings, or press Continue anyway.`,
+      evidence: loc,
+    };
   }
   const usMatch = usWord || US_STATE_SUFFIX.test(loc);
   if (usMatch) return null;
@@ -97,7 +135,7 @@ export function runHardFilters(input: FilterInput): FilterResult {
   if (PURE_SALES_TITLE.test(title)) fail("pure_sales", "Pure sales role. Excluded, and a STEM OPT risk (not related to the CS degree).");
 
   // --- Location
-  const loc = locationCheck(input.location, f);
+  const loc = locationCheck(input.location, f, input.otherCountries);
   if (loc) reasons.push(loc);
 
   // --- STEM OPT: paid, direct employer, ≥20 h/week

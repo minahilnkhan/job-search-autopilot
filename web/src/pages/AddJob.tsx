@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import type { ExtractedFields, Job } from "../../../shared/types";
 import { api, type FilterResult } from "../lib/api";
 import { FieldsEditor } from "../components/FieldsEditor";
-import { ReasonList, VerdictBadge } from "../components/Verdict";
+import { ReasonList, VerdictBadge, ContinueAnyway } from "../components/Verdict";
 import { ScoreBadge, ScoreBreakdownView } from "../components/Score";
 
 type Posting = { companyName: string; title: string; location: string; url: string; postedAt: string; description: string };
@@ -93,7 +93,7 @@ export function AddJob({ onSaved }: { onSaved: () => void }) {
                 {job.location ? `, ${job.location}` : ""}
               </p>
             </div>
-            <VerdictBadge pass={job.hardFilterPass} reasons={job.filterReasons} />
+            <VerdictBadge pass={job.hardFilterPass} reasons={job.filterReasons} overridden={job.filterOverride} />
           </div>
           <ReasonList reasons={job.filterReasons} />
           {job.scoreBreakdown && (
@@ -108,6 +108,9 @@ export function AddJob({ onSaved }: { onSaved: () => void }) {
         </article>
         {error && <p className="text-[15px] text-fail">{error}</p>}
         <div className="flex flex-wrap gap-3">
+          {(!job.hardFilterPass || job.filterOverride) && (
+            <ContinueAnyway jobId={job.id} overridden={job.filterOverride} onChange={(j) => { setSaved({ duplicate, job: j }); onSaved(); }} />
+          )}
           {job.hardFilterPass && !job.scoreBreakdown && (
             <button
               className="btn-primary"

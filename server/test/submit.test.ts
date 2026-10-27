@@ -541,3 +541,14 @@ describe.skipIf(!chromiumPath)("extension fill script", () => {
     expect(await page.locator("textarea[name=comments]").inputValue()).toBe("I ship production Claude features.");
   }, 20000);
 });
+
+describe("work authorization on jobs abroad", () => {
+  it("never puts US answers on a UK question, or on a generic one for a job outside the US", () => {
+    const uk = planFill([control({ id: "1", kind: "select", label: "Do you have the right to work in the UK?*", required: true, options: [{ text: "Yes" }, { text: "No" }] })], VALUES);
+    expect(uk.actions).toEqual([]);
+    expect(uk.leftForYou[0]).toMatchObject({ reason: expect.stringContaining("other than the US"), required: true });
+    const generic = control({ id: "2", kind: "select", label: "Are you legally authorized to work in this country?", options: [{ text: "Yes" }, { text: "No" }] });
+    expect(planFill([generic], { ...VALUES, jobOutsideUS: true }).actions).toEqual([]);
+    expect(planFill([generic], VALUES).actions).toEqual([expect.objectContaining({ op: "select", value: "Yes" })]);
+  });
+});

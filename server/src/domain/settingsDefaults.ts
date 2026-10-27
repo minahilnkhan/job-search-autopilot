@@ -29,7 +29,8 @@ export const DEFAULT_SETTINGS: Settings = {
     authorizedToWorkInUS: "Yes",
     requiresSponsorshipNowOrFuture: "Yes",
   },
-  locationPrefs: { preferred: ["Chicago, IL", "Remote (US)"], openToRelocation: true },
+  // otherCountries: outside the US, jobs in these pass with a visa warning.
+  locationPrefs: { preferred: ["Chicago, IL", "Remote (US)"], openToRelocation: true, otherCountries: ["United Kingdom"] },
   // Small model for bulk scoring, larger one for tailoring and check-ins.
   models: {
     scoring: "claude-haiku-5-5",

@@ -37,6 +37,8 @@ export type PrefillValues = {
   answers: Answer[];
   recruiterNote: string | null;
   resumeFileName: string;
+  /** The job is outside the US: the US work-auth answers don't apply to its form. */
+  jobOutsideUS?: boolean;
 };
 
 export function norm(s: string): string {
@@ -158,6 +160,15 @@ export function planFill(controls: FormControl[], v: PrefillValues): FillPlan {
     }
 
     // Work authorization: always the fixed answers from Settings.
+    const isWorkAuth = /\bsponsor|\bvisa\b|\b(authori[sz]ed to work|eligible to work|legally (able|allowed|permitted) to work|right to work|work authori[sz]ation|work permit)\b/.test(label);
+    const namesOtherCountry = /\b(uk|united kingdom|britain|england|ireland|canada|eu|europe|european|germany|netherlands|singapore|australia)\b/.test(label);
+    const namesUS = /\b(us|u s|usa|united states|america)\b/.test(label);
+    // Your fixed answers are about the US. A question about another country
+    // (or a generic one on a job abroad) is yours to answer: never guess it.
+    if (isWorkAuth && (namesOtherCountry || (v.jobOutsideUS && !namesUS))) {
+      left("Work authorization for a country other than the US: answer it yourself (your US answers don't apply)");
+      continue;
+    }
     const fixed = /\bsponsor/.test(label) ? fixedSponsor : /\b(authori[sz]ed to work|eligible to work|legally (able|allowed|permitted) to work|right to work|work authori[sz]ation)\b/.test(label) ? fixedAuth : undefined;
     if (fixed) {
       const a = planAnswer(c, fixed.answer);
@@ -166,7 +177,7 @@ export function planFill(controls: FormControl[], v: PrefillValues): FillPlan {
       continue;
     }
 
-    // Country (phone country or residence): she lives and works in the US.
+    // Country (phone country or residence): she lives in the US.
     if (/^(country|country of residence|phone country)$/.test(label)) {
       const act = planAnswer(c, "United States");
       if (act) actions.push(act);

@@ -104,6 +104,7 @@ export const settingsBody = z.object({
   locationPrefs: z.object({
     preferred: z.array(z.string().trim().min(1)),
     openToRelocation: z.boolean(),
+    otherCountries: z.array(z.string().trim().min(1)).max(30).default([]),
   }),
   models: z.object({
     scoring: z.string().trim().min(1),

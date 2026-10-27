@@ -200,8 +200,17 @@ export function Settings() {
         <legend className="px-1 text-lg font-semibold">Location</legend>
         <div>
           <label className="label">Preferred locations (comma-separated, used to break ties)</label>
-          <input className="field" value={s.locationPrefs.preferred.join(", ")}
-            onChange={(e) => setS({ ...s, locationPrefs: { ...s.locationPrefs, preferred: e.target.value.split(",").map((x) => x.trim()).filter(Boolean) } })} />
+          <input className="field" defaultValue={s.locationPrefs.preferred.join(", ")}
+            onBlur={(e) => setS({ ...s, locationPrefs: { ...s.locationPrefs, preferred: e.target.value.split(",").map((x) => x.trim()).filter(Boolean) } })} />
+        </div>
+        <div>
+          <label className="label" htmlFor="countries">Also open to jobs in (countries, comma-separated)</label>
+          <input id="countries" className="field" defaultValue={s.locationPrefs.otherCountries.join(", ")} placeholder="United Kingdom, Ireland"
+            onBlur={(e) => setS({ ...s, locationPrefs: { ...s.locationPrefs, otherCountries: e.target.value.split(",").map((x) => x.trim()).filter(Boolean) } })} />
+          <p className="mt-1 text-sm text-muted">
+            Jobs in these countries pass the location filter with a reminder that you'd need a work visa there (STEM OPT only covers US jobs).
+            Recognized: United Kingdom, Ireland, Canada, Germany, Netherlands, Singapore. Anywhere else, use Continue anyway on the job.
+          </p>
         </div>
         <label className="flex items-center gap-2.5 text-[15px]">
           <input type="checkbox" className="h-4 w-4 accent-accent" checked={s.locationPrefs.openToRelocation}

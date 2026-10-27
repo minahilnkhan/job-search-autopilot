@@ -5,6 +5,7 @@ import { extractFields } from "../domain/extract";
 import { runHardFilters } from "../domain/hardFilters";
 import { dedupeKey } from "../domain/normalize";
 import { applicationHistory } from "./history";
+import { getSettings } from "./settings";
 import type {
   CreateJobRequest,
   CreateJobResponse,
@@ -35,6 +36,7 @@ function toJob(row: JobRow, companyName: string): Job {
     yearsRequired: row.yearsRequired,
     sponsorshipStated: row.sponsorshipStated,
     hardFilterPass: row.hardFilterPass,
+    filterOverride: !!row.filterOverride,
     filterReasons: row.filterFailReasons,
     extractedFields: row.extractedFields,
     fitScore: row.fitScore,
@@ -77,14 +79,18 @@ export function filterJob(
     excludeJobId: args.jobId,
     now: args.now,
   });
-  return runHardFilters({
+  const result = runHardFilters({
     title: args.title,
     location: args.location,
     fields: args.fields,
     company: { eVerify: args.company.eVerify },
     history,
     requireTargetRole: args.source !== "manual",
+    otherCountries: getSettings(db).locationPrefs.otherCountries,
   });
+  // "Continue anyway" keeps a job going whatever its filters say; the reasons stay visible.
+  const overridden = args.jobId ? !!db.select({ o: jobs.filterOverride }).from(jobs).where(eq(jobs.id, args.jobId)).get()?.o : false;
+  return { ...result, pass: result.pass || overridden };
 }
 
 export { toJob };
@@ -244,4 +250,16 @@ export function deleteJobs(db: DB, ids: number[], now = new Date()): { deleted: 
     }
   });
   return { deleted, kept };
+}
+
+/** "Continue anyway": go ahead with a job despite a failed hard filter. Undo puts the filters back in charge. */
+export function overrideFilters(db: DB, id: number, on: boolean, now = new Date()) {
+  const job = db.select().from(jobs).where(eq(jobs.id, id)).get();
+  if (!job) throw new NotFoundError(`Job ${id} not found`);
+  const failing = (job.filterFailReasons ?? []).some((r) => r.severity === "fail");
+  db.update(jobs)
+    .set({ filterOverride: on ? now : null, hardFilterPass: on || !failing, ...(on && job.status === "dismissed" ? { status: "new" as const } : {}) })
+    .where(eq(jobs.id, id))
+    .run();
+  return getJob(db, id);
 }

@@ -54,7 +54,7 @@ describe("Phase 1 acceptance: paste a JD → stored, hard-filtered, with fail re
 
   it("PATCH edits fields and re-filters", async () => {
     const { job } = (await post("/api/jobs", { companyName: "Acme AI", title: "FDE", location: "Chicago, IL", description: FDE_JD })).json();
-    const res = await app.inject({ method: "PATCH", url: `/api/jobs/${job.id}`, payload: { location: "London, UK" } });
+    const res = await app.inject({ method: "PATCH", url: `/api/jobs/${job.id}`, payload: { location: "Berlin, Germany" } });
     expect(res.json().hardFilterPass).toBe(false);
   });
 
@@ -132,5 +132,27 @@ describe("pipeline routes", () => {
     const res = await app.inject({ method: "PUT", url: "/api/settings", payload: bad });
     expect(res.statusCode).toBe(400);
     expect(res.json().issues.map((i: { path: string }) => i.path).sort()).toEqual(["pipeline.dailyTime", "pipeline.timezone"]);
+  });
+});
+
+describe("Continue anyway and jobs abroad", () => {
+  it("a UK job passes by default with a visa warning; Continue anyway overrides a failed filter and survives re-filtering; undo restores it", async () => {
+    const { buildApp } = await import("../src/app");
+    const { makeTestDb, OFFLINE_PIPELINE, prepDeps, FDE_JD } = await import("./helpers");
+    const app = buildApp(makeTestDb(), { pipeline: OFFLINE_PIPELINE, prep: prepDeps() });
+    const post = (url: string, payload?: object) => app.inject({ method: "POST", url, payload });
+    const uk = (await post("/api/jobs", { companyName: "Twirl", title: "Software Engineer", location: "London, UK", description: FDE_JD })).json().job;
+    expect(uk.hardFilterPass).toBe(true);
+    expect(uk.filterReasons).toEqual(expect.arrayContaining([expect.objectContaining({ code: "location_abroad" })]));
+
+    const de = (await post("/api/jobs", { companyName: "Twirl", title: "Software Engineer", location: "Berlin, Germany", description: FDE_JD })).json().job;
+    expect(de.hardFilterPass).toBe(false);
+    const on = (await post(`/api/jobs/${de.id}/continue`, { on: true })).json();
+    expect(on).toMatchObject({ hardFilterPass: true, filterOverride: true });
+    // Editing the job re-runs the filters; the override holds.
+    const edited = (await app.inject({ method: "PATCH", url: `/api/jobs/${de.id}`, payload: { title: "Software Engineer II" } })).json();
+    expect(edited.hardFilterPass).toBe(true);
+    const off = (await post(`/api/jobs/${de.id}/continue`, { on: false })).json();
+    expect(off).toMatchObject({ hardFilterPass: false, filterOverride: false });
   });
 });

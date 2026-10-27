@@ -99,6 +99,8 @@ export const jobs = sqliteTable(
     dedupeKey: text("dedupe_key").notNull(),
     // Deleted from the Jobs page. The row stays so the daily fetch doesn't add the posting back.
     deletedAt: integer("deleted_at", { mode: "timestamp_ms" }),
+    // "Continue anyway": you chose to go ahead despite a failed hard filter.
+    filterOverride: integer("filter_override", { mode: "timestamp_ms" }),
     createdAt: createdAt(),
   },
   (t) => [

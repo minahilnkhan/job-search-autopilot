@@ -78,6 +78,13 @@
       "when": 1792826666489,
       "tag": "0010_extension_token",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "6",
+      "when": 1793072839775,
+      "tag": "0011_filter_override",
+      "breakpoints": true
     }
   ]
 }

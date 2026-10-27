@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import type { ExtractedFields, JobListItem } from "../../../shared/types";
 import { api } from "../lib/api";
 import { FieldsEditor } from "../components/FieldsEditor";
-import { ReasonList, VerdictBadge } from "../components/Verdict";
+import { ContinueAnyway, ReasonList, VerdictBadge } from "../components/Verdict";
 import { ScoreBadge, ScoreBreakdownView } from "../components/Score";
 import { AcceptButton } from "../components/AcceptButton";
 
@@ -68,7 +68,7 @@ function JobRow({ job, onChange, selected, onSelect }: { job: JobListItem; onCha
         </div>
         <div className="flex flex-wrap gap-2">
           <ScoreBadge score={job.fitScore} tier={job.tier} />
-          <VerdictBadge pass={job.hardFilterPass} reasons={job.filterReasons} />
+          <VerdictBadge pass={job.hardFilterPass} reasons={job.filterReasons} overridden={job.filterOverride} />
         </div>
       </button>
       </div>
@@ -94,6 +94,9 @@ function JobRow({ job, onChange, selected, onSelect }: { job: JobListItem; onCha
             </div>
           ) : (
             <div className="flex flex-wrap gap-2">
+              {(!job.hardFilterPass || job.filterOverride) && job.status !== "shortlisted" && (
+                <ContinueAnyway jobId={job.id} overridden={job.filterOverride} onChange={(j) => onChange({ ...job, ...j })} />
+              )}
               {job.hardFilterPass && (
                 <button className="btn-quiet" disabled={busy} onClick={() => act(() => api.scoreJob(job.id))}>
                   {busy ? "Scoring…" : job.scoredAt ? "Score again" : "Score now"}

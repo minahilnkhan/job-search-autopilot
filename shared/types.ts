@@ -71,6 +71,8 @@ export type Job = {
   yearsRequired: number | null;
   sponsorshipStated: SponsorshipStated;
   hardFilterPass: boolean;
+  /** You pressed "Continue anyway" on a failed hard filter. */
+  filterOverride: boolean;
   filterReasons: FilterReason[];
   extractedFields: ExtractedFields;
   fitScore: number | null;
@@ -136,7 +138,7 @@ export type Settings = {
     authorizedToWorkInUS: "Yes" | "No";
     requiresSponsorshipNowOrFuture: "Yes" | "No";
   };
-  locationPrefs: { preferred: string[]; openToRelocation: boolean };
+  locationPrefs: { preferred: string[]; openToRelocation: boolean; otherCountries: string[] };
   models: { scoring: string; tailoring: string; checkIns: string };
   /** What makes Today's picks. Only applies to ranking; scoring is unchanged. */
   /** Your own answers to common application questions, reused as-is (never AI-written). */
