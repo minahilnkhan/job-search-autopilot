@@ -40,6 +40,8 @@ const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&l
 const clean = (s: string) => s.replace(/[✱*]\s*$/, "").replace(/\s+/g, " ").trim().toLowerCase();
 const NOTE_FIELD = /cover letter|additional information|anything else|message to (the )?(hiring|recruit)/i;
 
+const cut = (t: string, n: number) => (t.length > n ? t.slice(0, n - 1) + "…" : t);
+
 async function api<T>(path: string, body?: unknown): Promise<T> {
   const res = await fetch(`${cfg.appUrl}/api/extension${path}`, {
     method: body === undefined ? "GET" : "POST",
@@ -49,7 +51,12 @@ async function api<T>(path: string, body?: unknown): Promise<T> {
     throw new Error("Can't reach the app. Is it running (npm run dev)?");
   });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error((data as { error?: string }).error ?? `The app said ${res.status}`);
+  if (!res.ok) {
+    const d = data as { error?: string; issues?: { path: string; message: string }[] };
+    // Say which field the app rejected, not just "Invalid input".
+    const why = d.issues?.length ? ` (${d.issues.slice(0, 3).map((i) => `${i.path}: ${i.message}`).join("; ")})` : "";
+    throw new Error(`${d.error ?? `The app said ${res.status}`}${why}`);
+  }
   return data as T;
 }
 
@@ -141,7 +148,14 @@ async function fill() {
       const key = (c: { frameId: number; id: string }) => `${c.frameId}|${c.id}`;
       const out = await api<{ answers: { controlId: string; value: string }[]; asks: (Omit<Ask, "frameId" | "localId"> & { controlKey: string })[] }>(
         `/applications/${selected}/questions`,
-        { url: tab.url, controls: unanswered.map(({ frameId, ...c }) => ({ ...c, id: key({ frameId, id: c.id }), options: c.options.map((o) => ({ text: o.text })) })) }
+        { url: tab.url, controls: unanswered.slice(0, 100).map(({ frameId, ...c }) => ({
+          ...c,
+          id: key({ frameId, id: c.id }),
+          label: cut(c.label, 2000),
+          hints: cut(c.hints, 2000),
+          value: cut(c.value, 10000),
+          options: c.options.slice(0, 300).map((o) => ({ text: cut(o.text, 500) })),
+        })) }
       );
       const handled = new Set<string>();
       for (const a of out.answers) {
@@ -160,7 +174,12 @@ async function fill() {
       agg.leftForYou = agg.leftForYou.filter((l) => !labels.has(l.label));
     }
     result = agg;
-    await api(`/applications/${selected}/report`, agg);
+    await api(`/applications/${selected}/report`, {
+      filled: agg.filled.slice(0, 300).map((f) => ({ label: cut(f.label, 500), value: cut(f.value, 10000) })),
+      leftForYou: agg.leftForYou.slice(0, 300).map((l) => ({ label: cut(l.label, 500), reason: cut(l.reason, 500), required: l.required })),
+      resumeUploaded: agg.resumeUploaded,
+      notices: agg.notices.slice(0, 20).map((n) => cut(n, 1000)),
+    });
     const asks = messages.filter((m) => m.role === "ask").length;
     status = asks
       ? { kind: "warn", text: `Filled ${agg.filled.length} fields${agg.resumeUploaded ? " and attached your resume" : ""}. ${asks} question${asks === 1 ? "" : "s"} for you in Chat.` }
