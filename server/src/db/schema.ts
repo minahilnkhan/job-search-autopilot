@@ -9,6 +9,7 @@ import {
   type AnySQLiteColumn,
 } from "drizzle-orm/sqlite-core";
 import type {
+  TailoringInfo,
   NoteBasis,
   PrefillReport,
   Answer,
@@ -144,7 +145,7 @@ export const applications = sqliteTable(
     reviewReason: text("review_reason"), // why you rejected it in review
     snoozedUntil: text("snoozed_until"), // YYYY-MM-DD
     prepNotes: text("prep_notes", { mode: "json" }).$type<string[]>(),
-    tailoring: text("tailoring", { mode: "json" }).$type<{ keywordsCovered: string[]; keywordsMissing: string[]; honestGaps: string[]; mustHaves?: string[]; suggestions?: string[] }>(),
+    tailoring: text("tailoring", { mode: "json" }).$type<TailoringInfo>(),
     // What the recruiter note was built around, so you can judge and edit it.
     noteBasis: text("note_basis", { mode: "json" }).$type<NoteBasis>(),
     // Phase 4: what the assisted-submit prefill filled and left for you.

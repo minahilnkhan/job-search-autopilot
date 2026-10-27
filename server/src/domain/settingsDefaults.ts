@@ -19,7 +19,7 @@ export const DEFAULT_SETTINGS: Settings = {
   },
   targets: {
     appsPerDay: 10,
-    daysPerWeek: 6,
+    daysPerWeek: 7, // mentor prompt v2: 10 a day, 7 days = 70/week
     hoursPerWeekCap: 30,
     bucketHours: { applications: 20, projects: 6, prep: 4 },
   },

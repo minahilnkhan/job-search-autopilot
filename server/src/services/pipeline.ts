@@ -169,7 +169,7 @@ export async function scoreJob(db: DB, jobId: number, scorer: Scorer, now: Date)
 }
 
 /** Postings older than this aren't scored: the mentor prompt treats them as likely stale or ghost jobs. */
-export const MAX_SCORE_AGE_DAYS = 30;
+export const MAX_SCORE_AGE_DAYS = 14; // mentor prompt v2: eligible up to 14 days, preferred up to 7
 
 /**
  * Re-check job-board postings against the current extraction and filter

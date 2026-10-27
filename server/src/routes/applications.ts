@@ -3,6 +3,8 @@ import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import type { DB } from "../db/client";
 import {
+  answerTailoringQuestion,
+  skillsToBuild,
   applicationFile,
   approveApplication,
   editApplication,
@@ -107,6 +109,20 @@ export function applicationRoutes(app: FastifyInstance, db: DB, deps: PrepDeps) 
     const b = z.object({ instructions: z.string().trim().min(1).max(2000), currentNote: z.string().max(4000).nullable().optional() }).parse(req.body);
     return suggestNote(db, idParam.parse(req.params).id, b.instructions, b.currentNote ?? null, deps);
   });
+  // Assumption protocol: confirm or decline one question or suggested skill.
+  app.post("/api/applications/:id/tailoring/answer", async (req) => {
+    const b = z
+      .object({
+        kind: z.enum(["assumption", "skill"]),
+        index: z.number().int().min(0),
+        confirmed: z.boolean(),
+        answer: z.string().max(2000).optional(),
+        text: z.string().max(600).optional(),
+      })
+      .parse(req.body);
+    return answerTailoringQuestion(db, idParam.parse(req.params).id, b, deps);
+  });
+  app.get("/api/skills-to-build", async () => skillsToBuild(db));
   app.post("/api/applications/:id/restart", async (req) => restartApplication(db, idParam.parse(req.params).id, deps));
 
   app.get("/api/applications", async (req) => {

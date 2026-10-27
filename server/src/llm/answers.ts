@@ -1,7 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { z } from "zod";
 import type { TokenUsage } from "./pricing";
-import { fillMentorPrompt, type MentorContext } from "./context";
+import { fillMentorPrompt, mentorPromptFor, type MentorContext } from "./context";
 import { ScoreError } from "./scoreJob";
 
 // Answers the questions on a live application form that nothing prepared
@@ -68,7 +68,7 @@ export function makeAnthropicAnswerWriter(opts: { apiKey: string; model: string;
   const system: Anthropic.TextBlockParam[] = [
     {
       type: "text",
-      text: fillMentorPrompt(opts.context.mentorPrompt, {
+      text: fillMentorPrompt(mentorPromptFor(opts.context.mentorPrompt, "resume"), {
         candidate_inventory: opts.context.inventory,
         current_resume: "(The resume is in the message.)",
         tracker_state: "(Not used.)",

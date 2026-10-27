@@ -2,7 +2,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { z } from "zod";
 import type { ModelJudgment } from "../domain/scoring";
 import type { TokenUsage } from "./pricing";
-import { fillMentorPrompt, type MentorContext } from "./context";
+import { fillMentorPrompt, mentorPromptFor, type MentorContext } from "./context";
 
 export type ScoreInput = {
   companyName: string;
@@ -99,7 +99,7 @@ export const judgmentSchema = z.object({
 });
 
 const INSTRUCTIONS = `<task>
-You are scoring ONE job posting for the candidate, using the "Fit score (1–10)" rubric in the mentor prompt above.
+You are scoring ONE job posting for the candidate, using the rubric in "MODULE: SCORING" above (Requirements 0-4, Role signal 0-2, Stack 0-2).
 
 Do only these parts. Code handles everything else (strategic bonus, tiers, sponsorship, E-Verify, freshness, and the hard filters, which this posting already passed):
 1. requirements: list the posting's must-have requirements (at most 8; skip nice-to-haves). For each, decide met = yes / partial / no using ONLY facts in <candidate_inventory>. Put the supporting inventory fact in "evidence". If there is no supporting fact, use an empty string and do not say "yes".
@@ -115,7 +115,7 @@ const NOT_FOR_SCORING = "(Not used for job scoring.)";
 
 /** The mentor prompt with the inventory filled in; the other slots aren't needed to score a job. */
 export function scoringSystemPrompt(ctx: MentorContext): string {
-  return fillMentorPrompt(ctx.mentorPrompt, {
+  return fillMentorPrompt(mentorPromptFor(ctx.mentorPrompt, "scoring"), {
     candidate_inventory: ctx.inventory,
     current_resume: NOT_FOR_SCORING,
     tracker_state: NOT_FOR_SCORING,

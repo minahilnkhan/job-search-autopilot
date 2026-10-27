@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { config } from "../config";
 import { parseInventory, type InventoryFacts } from "../domain/inventory";
+import { ADDITIONS_FILE, withConfirmedAdditions } from "../llm/context";
 
 // Loads the Truth Check rules from data/private/candidate_inventory.md (plus
 // optional extra patterns), and writes the derived rules to
@@ -19,11 +20,13 @@ export function loadTruthFacts(dir = config.privateDir): InventoryFacts {
     throw new MissingInventoryError("Missing data/private/candidate_inventory.md. The Truth Check can't run without it.");
   }
   const mtime = (p: string) => (fs.existsSync(p) ? fs.statSync(p).mtimeMs : 0);
-  const key = `${dir}:${mtime(inventoryPath)}:${mtime(extraPath)}`;
+  // Your confirmed answers to assumption questions count as inventory facts.
+  const additionsPath = path.join(dir, ADDITIONS_FILE);
+  const key = `${dir}:${mtime(inventoryPath)}:${mtime(extraPath)}:${mtime(additionsPath)}:${fs.existsSync(additionsPath) ? fs.statSync(additionsPath).size : 0}`;
   if (cache?.key === key) return cache.facts;
 
   const extra = fs.existsSync(extraPath) ? JSON.parse(fs.readFileSync(extraPath, "utf8")) : undefined;
-  const facts = parseInventory(fs.readFileSync(inventoryPath, "utf8"), extra);
+  const facts = parseInventory(withConfirmedAdditions(fs.readFileSync(inventoryPath, "utf8"), dir), extra);
   try {
     fs.writeFileSync(
       path.join(dir, "do_not_claim.json"),

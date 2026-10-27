@@ -219,7 +219,7 @@ describe("account problems", () => {
 });
 
 describe("cost cuts", () => {
-  it("doesn't score postings older than 30 days, and counts them", async () => {
+  it("doesn't score postings older than 14 days (mentor prompt v2), and counts them", async () => {
     const withStale: FetchBoard = async (b) => {
       const postings = await fixtureBoards(b);
       if (b.atsType !== "greenhouse") return postings;

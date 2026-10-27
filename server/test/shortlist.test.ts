@@ -18,6 +18,12 @@ const c = (o: Partial<Candidate>): Candidate => ({
 const rank = (cs: Candidate[], size = 13) => rankShortlist(cs, { size, preferredLocations: ["Chicago, IL", "Remote (US)"], now: NOW });
 
 describe("rankShortlist", () => {
+  it("mentor prompt v2: a posting under 72 hours beats an older one in the same week, even a remote one", () => {
+    const sixDaysRemote = c({ postedAt: "2026-10-17", remote: true, location: "Remote", companyId: 1 });
+    const twoDays = c({ postedAt: "2026-10-21", companyId: 2 });
+    expect(rank([sixDaysRemote, twoDays])).toEqual([twoDays.jobId, sixDaysRemote.jobId]);
+  });
+
   it("orders by score, highest first, and drops skip-tier jobs", () => {
     const a = c({ fitScore: 6, companyId: 1 });
     const b = c({ fitScore: 9, tier: "A", companyId: 2 });

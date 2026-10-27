@@ -66,8 +66,11 @@ export function rankShortlist(
       rank: rankScore(c),
       city: city ? 1 : 0,
       score: c.fitScore,
-      fresh: age !== null && age <= 7 ? 1 : 0, // prefer postings under a week old
-      notStale: age === null || age <= 30 ? 1 : 0,
+      // Mentor prompt v2: eligible up to 14 days, preferred up to 7, and under
+      // 72 hours is best (fewer applicants yet).
+      fresh: age !== null && age <= 7 ? 1 : 0,
+      veryFresh: age !== null && age <= 3 ? 1 : 0,
+      notStale: age === null || age <= 14 ? 1 : 0,
       remote: c.remote ? 1 : 0,
       warm: c.warmContact ? 1 : 0,
       age: age ?? 9999,
@@ -82,6 +85,7 @@ export function rankShortlist(
       kb.city - ka.city || // on a tie, the preferred city wins
       kb.score - ka.score ||
       kb.fresh - ka.fresh ||
+      kb.veryFresh - ka.veryFresh ||
       kb.remote - ka.remote || // then remote (mentor prompt: Chicago or remote breaks a tie)
       kb.warm - ka.warm ||
       ka.age - kb.age ||

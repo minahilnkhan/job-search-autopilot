@@ -1,4 +1,4 @@
-import type { BaseType, ResumeChange, ResumeContent } from "../../../shared/types";
+import type { AssumptionQuestion, BaseType, ResumeChange, ResumeContent, SkillSuggestion } from "../../../shared/types";
 import { resumeLines, setLine } from "./resumeFormat";
 
 // What the tailoring model may change, and how it's applied. It may reword
@@ -19,6 +19,10 @@ export type TailorPlan = {
   keywordsMissing: string[];
   honestGaps: string[];
   suggestions: string[]; // e.g. "Swap in the Teaching Assistant role to cover mentoring": for you to decide
+  /** Assumption protocol: questions with a ready draft line. Never applied until she confirms. */
+  assumptionQuestions?: { question: string; draft: string; needs: string; lineId: string }[];
+  /** Up to 10 learnable, JD-essential skills. Listed only if she confirms. */
+  skillsAdded?: { skill: string; lineId: string; reason: string }[];
 };
 
 const MAX_ADDED_BULLETS = 3;
@@ -164,4 +168,53 @@ export function applyPlan(base: ResumeContent, plan: Plan) {
     }
   }
   return { content: out, changes, notes };
+}
+
+const MAX_ASSUMPTIONS = 6;
+const MAX_SKILLS = 10;
+const stripTags = (t: string) => t.replace(/\s*\[(CONFIRM|HER ESTIMATE)\]\s*/gi, " ").replace(/\s+/g, " ").trim();
+const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+/**
+ * The assumption questions and skill suggestions, pinned to the text of the
+ * line each would change (after this plan's edits), so later reorders and
+ * your own edits don't send a confirmation to the wrong line. Questions about
+ * lines the plan removed, or that point nowhere, are dropped.
+ */
+export function pendingQuestions(base: ResumeContent, plan: Pick<TailorPlan, "lineEdits" | "removeBullets" | "assumptionQuestions" | "skillsAdded">) {
+  const lines = new Map(resumeLines(base).map((l) => [l.id, l]));
+  const removed = new Set(plan.removeBullets?.map((r) => r.id) ?? []);
+  const textOf = (id: string) => plan.lineEdits.find((e) => e.id === id)?.after.trim() ?? lines.get(id)?.text;
+  const resumeText = resumeLines(base).map((l) => l.text).join("\n");
+
+  const assumptions: AssumptionQuestion[] = [];
+  for (const q of plan.assumptionQuestions ?? []) {
+    const line = lines.get(q.lineId);
+    const draft = stripTags(q.draft);
+    if (!line || line.kind !== "bullet" || removed.has(q.lineId) || !draft || !q.question.trim()) continue;
+    if (assumptions.some((a) => a.targetText === textOf(q.lineId))) continue; // one question per line
+    assumptions.push({ question: q.question.trim(), draft, needs: q.needs.trim(), targetText: textOf(q.lineId)!, where: line.where, status: "open" });
+    if (assumptions.length >= MAX_ASSUMPTIONS) break;
+  }
+
+  const skills: SkillSuggestion[] = [];
+  for (const k of plan.skillsAdded ?? []) {
+    const skill = stripTags(k.skill).replace(/[,;]+/g, " ").trim();
+    const line = lines.get(k.lineId);
+    if (!skill || !line || line.kind !== "line") continue;
+    if (new RegExp(`(^|[^A-Za-z0-9])${escapeRe(skill)}([^A-Za-z0-9]|$)`, "i").test(resumeText)) continue; // already on the page
+    if (skills.some((s) => s.skill.toLowerCase() === skill.toLowerCase())) continue;
+    skills.push({ skill, reason: k.reason.trim(), targetText: textOf(k.lineId)!, where: line.where, status: "open" });
+    if (skills.length >= MAX_SKILLS) break;
+  }
+  return { assumptions, skillsAdded: skills };
+}
+
+/** The current line a pinned question points at: same text, or for a Skills line, the same "Label:". */
+export function findPinnedLine(content: ResumeContent, targetText: string, kind: "bullet" | "line") {
+  const all = resumeLines(content).filter((l) => l.kind === kind);
+  const exact = all.find((l) => l.text === targetText);
+  if (exact) return exact;
+  const label = /^([^:]{2,40}):/.exec(targetText)?.[1];
+  return label ? all.find((l) => l.text.startsWith(`${label}:`)) : undefined;
 }

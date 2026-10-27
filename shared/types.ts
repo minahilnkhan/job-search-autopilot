@@ -304,7 +304,35 @@ export type ApplicationDetail = ApplicationSummary & {
   hasDocx: boolean;
   prepNotes: string[];
   reviewReason: string | null; // why you rejected it
-  tailoring: { keywordsCovered: string[]; keywordsMissing: string[]; honestGaps: string[]; mustHaves?: string[]; suggestions?: string[] } | null;
+  tailoring: TailoringInfo | null;
+};
+
+/**
+ * Mentor prompt v2, assumption protocol: tailoring may ask about work you
+ * plausibly did. A draft line never reaches the resume until you confirm it;
+ * your answer is saved to data/private/confirmed_additions.md, which the
+ * Truth Check and every later prompt read as inventory.
+ */
+export type AssumptionQuestion = {
+  question: string;
+  draft: string; // the replacement line, used only once you confirm
+  needs: string; // what the model needs from you ("yes/no, and the tool")
+  targetText: string; // the line it would replace, found by text so reorders don't break it
+  where: string;
+  status: "open" | "confirmed" | "declined";
+  answer?: string;
+};
+/** A JD-essential, learnable skill the posting wants. Listed only if you confirm; always goes on "Skills to build". */
+export type SkillSuggestion = { skill: string; reason: string; targetText: string; where: string; status: "open" | "confirmed" | "declined" };
+
+export type TailoringInfo = {
+  keywordsCovered: string[];
+  keywordsMissing: string[];
+  honestGaps: string[];
+  mustHaves?: string[];
+  suggestions?: string[];
+  assumptions?: AssumptionQuestion[];
+  skillsAdded?: SkillSuggestion[];
 };
 
 export type BaseResume = {

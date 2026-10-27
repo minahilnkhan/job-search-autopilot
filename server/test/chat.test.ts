@@ -101,6 +101,6 @@ describe("extension chat", () => {
   it("summary counts what's waiting at each step", async () => {
     const { req } = await setup(() => ({ reply: "", edits: { lines: [], answers: [], recruiterNote: "" } }));
     const s = (await req("GET", "/api/summary")).body;
-    expect(s).toMatchObject({ approved: 1, review: 0, today: { submitted: 0, target: 10 }, week: { target: 60 } });
+    expect(s).toMatchObject({ approved: 1, review: 0, today: { submitted: 0, target: 10 }, week: { target: 70 } }); // 10 a day × 7 days (mentor prompt v2)
   });
 });

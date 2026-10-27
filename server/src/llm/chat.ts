@@ -1,7 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { z } from "zod";
 import type { TokenUsage } from "./pricing";
-import { fillMentorPrompt, type MentorContext } from "./context";
+import { fillMentorPrompt, mentorPromptFor, type MentorContext } from "./context";
 import { ScoreError } from "./scoreJob";
 
 // The extension's chat: you ask for a change ("shorten Why Anthropic to two
@@ -93,7 +93,7 @@ function systemFor(context: MentorContext, instructions: string): Anthropic.Text
   return [
     {
       type: "text",
-      text: fillMentorPrompt(context.mentorPrompt, {
+      text: fillMentorPrompt(mentorPromptFor(context.mentorPrompt, "resume"), {
         candidate_inventory: context.inventory,
         current_resume: "(The resume is in the message.)",
         tracker_state: "(Not used.)",

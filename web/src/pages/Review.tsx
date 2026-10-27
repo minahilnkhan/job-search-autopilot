@@ -78,6 +78,72 @@ function NoteEditor({ appId, current, onUse }: { appId: number; current: string;
   );
 }
 
+/**
+ * Mentor prompt v2, assumption protocol. Each question comes with a ready
+ * line marked [CONFIRM]; nothing reaches the resume until you say yes, and
+ * your answer becomes part of your inventory (data/private/confirmed_additions.md).
+ */
+function QuestionsForYou({ app, busy, dirty, act }: { app: ApplicationDetail; busy: string | null; dirty: boolean; act: (label: string, fn: () => Promise<ApplicationDetail>) => void }) {
+  const qs = app.tailoring?.assumptions ?? [];
+  const skills = app.tailoring?.skillsAdded ?? [];
+  const [answers, setAnswers] = useState<Record<number, string>>({});
+  const [drafts, setDrafts] = useState<Record<number, string>>({});
+  const open = qs.filter((q) => q.status === "open").length + skills.filter((k) => k.status === "open").length;
+  if (qs.length === 0 && skills.length === 0) return null;
+  const off = !!busy || dirty;
+  const reply = (body: Parameters<typeof api.answerTailoring>[1]) => act(`q-${body.kind}-${body.index}`, () => api.answerTailoring(app.id, body));
+  return (
+    <div className="space-y-3 rounded-lg border border-line bg-accent-bg/40 p-4">
+      <div className="flex items-baseline justify-between gap-3">
+        <p className="font-medium text-ink">Questions for you{open > 0 ? ` · ${open} open` : ""}</p>
+        {dirty && <p className="text-xs text-warn">Save your edits first</p>}
+      </div>
+      <p className="text-[13px] text-muted">Nothing here is on the resume until you confirm it. Your answers are saved to your inventory, so you won't be asked again.</p>
+      {qs.map((q, i) => (
+        <div key={`q${i}`} className="space-y-2 border-t border-line pt-3">
+          <p className="text-[13px] text-muted">{q.where}</p>
+          <p className="text-ink">{q.question}</p>
+          {q.status === "open" ? (
+            <>
+              <textarea className="field text-sm" rows={2} value={drafts[i] ?? q.draft} onChange={(e) => setDrafts({ ...drafts, [i]: e.target.value })} aria-label="Draft line" />
+              <p className="text-xs text-muted"><span className="chip mr-1">CONFIRM</span>Needs from you: {q.needs}</p>
+              <input className="field text-sm" placeholder="Your answer (a number you give is saved as your estimate)" value={answers[i] ?? ""} onChange={(e) => setAnswers({ ...answers, [i]: e.target.value })} />
+              <div className="flex gap-2">
+                <button className="btn-primary text-sm" disabled={off} onClick={() => reply({ kind: "assumption", index: i, confirmed: true, answer: answers[i], text: drafts[i] })}>Yes, use this line</button>
+                <button className="btn-quiet text-sm" disabled={off} onClick={() => reply({ kind: "assumption", index: i, confirmed: false })}>No, I didn't</button>
+              </div>
+            </>
+          ) : (
+            <p className={`text-sm ${q.status === "confirmed" ? "text-pass" : "text-muted"}`}>{q.status === "confirmed" ? `Confirmed${q.answer && q.answer !== "Yes" ? `: ${q.answer}` : ""}` : "Declined; the line stays as it was."}</p>
+          )}
+        </div>
+      ))}
+      {skills.length > 0 && (
+        <div className="space-y-2 border-t border-line pt-3">
+          <p className="text-ink">Skills the posting wants that aren't on your resume</p>
+          <p className="text-[13px] text-muted">List one only if you've used it and can describe what you built. Every one goes on Today's "Skills to build" list either way.</p>
+          <ul className="space-y-1.5">
+            {skills.map((k, i) => (
+              <li key={`k${i}`} className="flex flex-wrap items-center gap-2 text-sm">
+                <span className="font-medium text-ink">{k.skill}</span>
+                <span className="text-muted">{k.reason}</span>
+                {k.status === "open" ? (
+                  <span className="ml-auto flex gap-2">
+                    <button className="link" disabled={off} onClick={() => reply({ kind: "skill", index: i, confirmed: true })}>I've used it, list it</button>
+                    <button className="link text-muted" disabled={off} onClick={() => reply({ kind: "skill", index: i, confirmed: false })}>Not yet</button>
+                  </span>
+                ) : (
+                  <span className={`ml-auto ${k.status === "confirmed" ? "text-pass" : "text-muted"}`}>{k.status === "confirmed" ? "Listed" : "To build"}</span>
+                )}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function Detail({ id, onChanged, onOpen }: { id: number; onChanged: () => void; onOpen: (id: number) => void }) {
   const [app, setApp] = useState<ApplicationDetail | null>(null);
   const [note, setNote] = useState("");
@@ -267,6 +333,8 @@ function Detail({ id, onChanged, onOpen }: { id: number; onChanged: () => void; 
           ) : (
             <p>No changes from your {app.baseType.toUpperCase()} base resume.</p>
           )}
+
+          {editable && <QuestionsForYou key={app.id} app={app} busy={busy} dirty={dirty} act={act} />}
 
           {app.tailoring && (
             <details className="text-sm">

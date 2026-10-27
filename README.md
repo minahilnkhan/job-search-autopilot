@@ -162,7 +162,8 @@ Open http://localhost:5173.
 
 **For scoring (Phase 2+)**, put two personal files in `data/private/` (gitignored):
 
-- `job-mentor-prompt.md`: the mentor agent's system prompt (rubric, filters, tiers)
+- `job-mentor-prompt.md`: the mentor agent's system prompt. Shared rules plus `# MODULE:` sections; each call gets only the module it needs
+- `confirmed_additions.md`: written by the app when you confirm an assumption question; read as part of your inventory (edit or delete lines freely)
 - `candidate_inventory.md`: verified facts plus the DO NOT CLAIM list (see `candidate_inventory.example.md`)
 
 Without the key or these files, runs still fetch and filter, and the run message says what's missing.

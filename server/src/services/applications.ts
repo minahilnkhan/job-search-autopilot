@@ -5,9 +5,11 @@ import type { DB } from "../db/client";
 import { applications, companies, jobs, resumeVersions } from "../db/schema";
 import { config } from "../config";
 import { removeLine, resumeLines, serializeResume, setLine } from "../domain/resumeFormat";
-import { applyPlan, chooseBase, resumeForPrompt } from "../domain/tailorPlan";
+import { applyPlan, chooseBase, findPinnedLine, pendingQuestions, resumeForPrompt } from "../domain/tailorPlan";
 import { applyTarget } from "../submit/applyUrl";
 import { runTruthCheck, type CheckLine } from "../domain/truthCheck";
+import { extractNumbers, numberKey } from "../domain/inventory";
+import { ADDITIONS_FILE } from "../llm/context";
 import { assertTransition } from "../domain/applicationStatus";
 import type { InventoryFacts } from "../domain/inventory";
 import type { Renderer } from "../render/renderer";
@@ -35,6 +37,8 @@ export type PrepDeps = {
   renderer: Renderer;
   facts: () => InventoryFacts;
   generatedDir?: string;
+  /** Where confirmed_additions.md lives (tests point this at a temp folder). */
+  privateDir?: string;
 };
 
 // Questions the tailoring model answers for Tier A. Your saved standard
@@ -254,6 +258,7 @@ export async function prepareApplication(db: DB, jobId: number, deps: PrepDeps, 
           honestGaps: result.plan.honestGaps,
           mustHaves: result.plan.mustHaves,
           suggestions: result.plan.suggestions,
+          ...pendingQuestions(base.content, result.plan),
         };
       } catch (err) {
         if (err instanceof ScoreError && err.usage) recordUsage(db, { purpose: "tailoring", model: settings.models.tailoring, usage: err.usage, jobId, now });
@@ -495,4 +500,119 @@ export function snoozeApplication(db: DB, id: number, until: string | null, now 
   if (app.status !== "ready_for_review") throw new ConflictError("Only applications waiting for review can be snoozed.");
   db.update(applications).set({ snoozedUntil: until, lastActivityAt: now }).where(eq(applications.id, id)).run();
   return getApplication(db, id);
+}
+
+// ---- Assumption protocol (mentor prompt v2) -------------------------------------
+
+export type TailoringReply = {
+  kind: "assumption" | "skill";
+  index: number;
+  confirmed: boolean;
+  /** Your answer in your words ("Yes, pytest, covering validation and language checks"). */
+  answer?: string;
+  /** The line to use, if you edited the draft. */
+  text?: string;
+};
+
+const clean = (t: string) => t.replace(/\s*\[(CONFIRM|HER ESTIMATE)\]\s*/gi, " ").replace(/\s+/g, " ").trim();
+
+/** Appends one confirmed fact to data/private/confirmed_additions.md (created on first use). */
+function appendAddition(dir: string, line: string) {
+  const p = path.join(dir, ADDITIONS_FILE);
+  const head = fs.existsSync(p)
+    ? ""
+    : "# Confirmed additions\nYour answers to assumption questions, written by the app when you confirm one. Edit or delete lines freely; the Truth Check and every prompt read this file as part of your inventory.\n\n";
+  fs.mkdirSync(dir, { recursive: true });
+  fs.appendFileSync(p, `${head}${line.replace(/\s+/g, " ").trim()}\n`);
+}
+
+/**
+ * Confirm or decline one assumption question or suggested skill. Confirming:
+ * 1. checks the line against DO NOT CLAIM and ownership first (refused if it hits),
+ * 2. requires any number in the line to come from your answer (tagged [HER ESTIMATE]),
+ * 3. saves your answer to confirmed_additions.md, so it's inventory from now on,
+ * 4. puts the line on this resume, which re-runs the Truth Check.
+ * Declining changes nothing on the resume.
+ */
+export async function answerTailoringQuestion(db: DB, id: number, reply: TailoringReply, deps: PrepDeps, now = new Date()) {
+  const app = loadEditable(db, id);
+  const job = getJob(db, app.jobId);
+  const tailoring = structuredClone(app.tailoring ?? null);
+  const list = reply.kind === "assumption" ? tailoring?.assumptions : tailoring?.skillsAdded;
+  const item = list?.[reply.index];
+  if (!tailoring || !item) throw new NotFoundError("That question isn't on this application.");
+  if (item.status !== "open") throw new ConflictError("You've already answered that one.");
+  const save = (notes?: string[]) =>
+    db.update(applications).set({ tailoring, lastActivityAt: now, ...(notes ? { prepNotes: notes } : {}) }).where(eq(applications.id, id)).run();
+
+  if (!reply.confirmed) {
+    item.status = "declined";
+    save();
+    return getApplication(db, id);
+  }
+
+  const version = db.select().from(resumeVersions).where(eq(resumeVersions.id, app.resumeVersionId!)).get()!;
+  const dir = deps.privateDir ?? config.privateDir;
+  const facts = deps.facts();
+  let lineId: string | undefined;
+  let newText: string;
+  let addition: string;
+
+  if (reply.kind === "assumption") {
+    const q = item as NonNullable<typeof tailoring.assumptions>[number];
+    const answer = (reply.answer ?? "").trim() || "Yes";
+    newText = clean(reply.text ?? q.draft);
+    if (!newText) throw new ConflictError("The line can't be empty.");
+    const hard = runTruthCheck({ lines: [{ where: q.where, text: newText }, { where: "Your answer", text: answer, checkNumbers: false }] }, facts).issues.filter(
+      (i) => i.kind === "do_not_claim" || i.kind === "ownership"
+    );
+    if (hard.length) throw new ConflictError(`Can't confirm this: ${hard[0]!.message}`);
+    // A number only you can supply: it must be in your answer, and it's marked as your estimate.
+    const given = new Set(extractNumbers(answer).map(numberKey));
+    const unbacked = extractNumbers(newText).filter((n) => !facts.allowedNumbers.has(numberKey(n)) && !given.has(numberKey(n)));
+    if (unbacked.length) throw new ConflictError(`The line says ${unbacked[0]!.raw}, which isn't in your inventory. Put the number in your answer (it'll be marked [HER ESTIMATE]) or take it out of the line.`);
+    const estimate = extractNumbers(answer).some((n) => !facts.allowedNumbers.has(numberKey(n))) ? " [HER ESTIMATE]" : "";
+    addition = `- ${q.where.split(" › ")[1] ?? q.where}: ${q.question} Her answer: ${answer}${estimate}. Confirmed line: "${newText}"`;
+    q.answer = answer;
+    lineId = findPinnedLine(version.content, q.targetText, "bullet")?.id;
+  } else {
+    const k = item as NonNullable<typeof tailoring.skillsAdded>[number];
+    const line = findPinnedLine(version.content, k.targetText, "line");
+    lineId = line?.id;
+    newText = line ? (/[:]\s*$/.test(line.text) ? `${line.text} ${k.skill}` : `${line.text}, ${k.skill}`) : "";
+    addition = `- Skill she has used and can describe: ${k.skill}`;
+  }
+
+  appendAddition(dir, addition);
+  item.status = "confirmed";
+  const notes = [...(app.prepNotes ?? [])];
+  if (!lineId) notes.push(`Saved your answer, but the line it was for has changed since tailoring. Add it yourself: "${reply.kind === "skill" ? (item as { skill: string }).skill : newText}".`);
+  save(notes);
+  if (lineId) return editApplication(db, id, { lines: [{ id: lineId, text: newText }] }, deps, now);
+  await finalizeApplication(db, id, deps, now);
+  return getApplication(db, id);
+}
+
+/** Every skill tailoring suggested in the last `days`, most-asked first: what to build this week. */
+export function skillsToBuild(db: DB, now = new Date(), days = 14) {
+  const since = now.getTime() - days * 86_400_000;
+  const rows = db
+    .select({ tailoring: applications.tailoring, createdAt: applications.createdAt, company: companies.name })
+    .from(applications)
+    .innerJoin(jobs, eq(jobs.id, applications.jobId))
+    .innerJoin(companies, eq(companies.id, jobs.companyId))
+    .all();
+  const by = new Map<string, { skill: string; count: number; companies: string[]; listed: boolean }>();
+  for (const r of rows) {
+    if (!r.tailoring?.skillsAdded?.length || (r.createdAt && new Date(r.createdAt).getTime() < since)) continue;
+    for (const k of r.tailoring.skillsAdded) {
+      const key = k.skill.toLowerCase();
+      const e = by.get(key) ?? { skill: k.skill, count: 0, companies: [], listed: false };
+      e.count++;
+      if (!e.companies.includes(r.company)) e.companies.push(r.company);
+      if (k.status === "confirmed") e.listed = true;
+      by.set(key, e);
+    }
+  }
+  return [...by.values()].sort((a, b) => b.count - a.count || a.skill.localeCompare(b.skill));
 }

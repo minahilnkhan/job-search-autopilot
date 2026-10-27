@@ -138,6 +138,29 @@ function Step({ n, state, title, detail, action }: { n: number; state: "next" | 
   );
 }
 
+/** Skills recent postings asked for that aren't on your resume: what this week's project should use. */
+function SkillsToBuild() {
+  const [skills, setSkills] = useState<{ skill: string; count: number; companies: string[]; listed: boolean }[] | null>(null);
+  useEffect(() => {
+    api.skillsToBuild().then(setSkills).catch(() => setSkills([]));
+  }, []);
+  if (!skills?.length) return null;
+  return (
+    <div className="panel space-y-2 p-6">
+      <p className="text-[13px] font-semibold tracking-wider text-muted uppercase">Skills to build</p>
+      <p className="text-[13px] text-muted">From the last two weeks of tailored postings. Pick this week's project around the top few.</p>
+      <ul className="space-y-1 text-sm">
+        {skills.slice(0, 8).map((k) => (
+          <li key={k.skill} className="flex items-baseline justify-between gap-2" title={k.companies.join(", ")}>
+            <span className="text-ink">{k.skill}{k.listed && <span className="ml-1.5 text-xs text-pass">on resume</span>}</span>
+            <span className="text-muted">{k.count} {k.count === 1 ? "posting" : "postings"}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 export function Today({ onJobsChanged }: { onJobsChanged: () => void }) {
   const [list, setList] = useState<Shortlist | null | undefined>(undefined);
   const [summary, setSummary] = useState<DaySummary | null>(null);
@@ -398,6 +421,7 @@ export function Today({ onJobsChanged }: { onJobsChanged: () => void }) {
               </div>
             </div>
           )}
+          <SkillsToBuild />
         </aside>
       </section>
     </div>

@@ -84,6 +84,9 @@ export const api = {
   suggestNote: (id: number, instructions: string, currentNote: string | null) =>
     request<{ note: string; basis: NoteBasis; issues: string[] }>("POST", `/api/applications/${id}/note/suggest`, { instructions, currentNote }),
   redraftNote: (id: number) => request<ApplicationDetail>("POST", `/api/applications/${id}/note`, {}),
+  answerTailoring: (id: number, body: { kind: "assumption" | "skill"; index: number; confirmed: boolean; answer?: string; text?: string }) =>
+    request<ApplicationDetail>("POST", `/api/applications/${id}/tailoring/answer`, body),
+  skillsToBuild: () => request<{ skill: string; count: number; companies: string[]; listed: boolean }[]>("GET", "/api/skills-to-build"),
   restart: (id: number) => request<ApplicationDetail>("POST", `/api/applications/${id}/restart`, {}),
   applications: (view: "review" | "blocked" | "snoozed" | "approved" | "closed") =>
     request<ApplicationSummary[]>("GET", `/api/applications?view=${view}`),

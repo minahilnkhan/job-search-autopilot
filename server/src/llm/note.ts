@@ -2,7 +2,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { z } from "zod";
 import type { NoteBasis } from "../../../shared/types";
 import type { TokenUsage } from "./pricing";
-import { fillMentorPrompt, type MentorContext } from "./context";
+import { fillMentorPrompt, mentorPromptFor, type MentorContext } from "./context";
 import { ScoreError } from "./scoreJob";
 
 // The recruiter note for every application (Tier A and B, and "Write it
@@ -70,7 +70,7 @@ export function makeAnthropicNoteWriter(opts: { apiKey: string; model: string; c
   const system: Anthropic.TextBlockParam[] = [
     {
       type: "text",
-      text: fillMentorPrompt(opts.context.mentorPrompt, {
+      text: fillMentorPrompt(mentorPromptFor(opts.context.mentorPrompt, "resume"), {
         candidate_inventory: opts.context.inventory,
         current_resume: "(The resume is in the message.)",
         tracker_state: "(Not used.)",
