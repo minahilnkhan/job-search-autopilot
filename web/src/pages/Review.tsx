@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import type { ApplicationDetail, ApplicationSummary, TruthIssue } from "../../../shared/types";
+import type { ApplicationDetail, ApplicationSummary, NoteBasis, TruthIssue } from "../../../shared/types";
 import { api } from "../lib/api";
 import { addDays, editableLines } from "../lib/resumeLines";
 import { TruthPanel } from "../components/TruthPanel";
@@ -7,6 +7,76 @@ import { SubmitPanel } from "../components/SubmitPanel";
 import { ScoreBreakdownView } from "../components/Score";
 
 const words = (s: string) => s.trim().split(/\s+/).filter(Boolean).length;
+
+const NOTE_IDEAS = ["Shorter", "Warmer, less formal", "More specific to this role", "Lead with the Roblox HQ camp", "Drop the certificates"];
+
+/**
+ * "Suggest an edit": say how the note should change; you get a rewrite to
+ * compare, with its Truth Check, and nothing is saved until you press Use this.
+ */
+function NoteEditor({ appId, current, onUse }: { appId: number; current: string; onUse: (text: string, basis: NoteBasis) => void }) {
+  const [open, setOpen] = useState(false);
+  const [how, setHow] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [proposal, setProposal] = useState<{ note: string; basis: NoteBasis; issues: string[] } | null>(null);
+
+  if (!open) {
+    return (
+      <button className="link text-sm" onClick={() => setOpen(true)}>Suggest an edit</button>
+    );
+  }
+  return (
+    <div className="space-y-2.5 border-t border-line pt-3">
+      <label className="label" htmlFor="note-how">How should it change?</label>
+      <textarea id="note-how" className="field text-sm" rows={3} value={how} onChange={(e) => setHow(e.target.value)}
+        placeholder="e.g. Cut it to three sentences, open with the Roblox HQ camp, and make the last line about their creator tools." />
+      <div className="flex flex-wrap gap-1.5">
+        {NOTE_IDEAS.map((idea) => (
+          <button key={idea} type="button" className="chip border border-line bg-surface text-ink hover:border-line-strong"
+            onClick={() => setHow((h) => (h.trim() ? `${h.trim().replace(/[.]$/, "")}. ${idea}.` : `${idea}.`))}>
+            {idea}
+          </button>
+        ))}
+      </div>
+      <div className="flex flex-wrap items-center gap-3">
+        <button className="btn-primary py-2 text-sm" disabled={busy || !how.trim()} onClick={async () => {
+          setBusy(true);
+          setError(null);
+          try {
+            setProposal(await api.suggestNote(appId, how, current));
+          } catch (e) {
+            setError((e as Error).message);
+          } finally {
+            setBusy(false);
+          }
+        }}>{busy ? "Rewriting…" : proposal ? "Rewrite again" : "Rewrite it"}</button>
+        <button className="link text-sm" onClick={() => { setOpen(false); setProposal(null); setHow(""); }}>Cancel</button>
+      </div>
+      {error && <p className="text-sm text-fail">{error}</p>}
+      {proposal && (
+        <div className="space-y-2 rounded-xl border border-line p-3">
+          <p className="text-[13px] text-muted">Suggested note · {proposal.note.trim().split(/\s+/).length} words</p>
+          <p className="text-sm leading-relaxed whitespace-pre-wrap text-ink">{proposal.note}</p>
+          {proposal.issues.length > 0 ? (
+            <p className="text-[13px] text-fail">The Truth Check flags this: {proposal.issues.join(" ")} Change your instructions and rewrite again.</p>
+          ) : (
+            <p className="text-[13px] text-pass">Passes the Truth Check.</p>
+          )}
+          <div className="flex gap-2">
+            <button className="btn-primary py-1.5 text-sm" disabled={proposal.issues.length > 0} onClick={() => {
+              onUse(proposal.note, proposal.basis);
+              setOpen(false);
+              setProposal(null);
+              setHow("");
+            }}>Use this</button>
+            <button className="btn-quiet py-1.5 text-sm" onClick={() => setProposal(null)}>Keep mine</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 function Detail({ id, onChanged, onOpen }: { id: number; onChanged: () => void; onOpen: (id: number) => void }) {
   const [app, setApp] = useState<ApplicationDetail | null>(null);
@@ -352,10 +422,17 @@ function Detail({ id, onChanged, onOpen }: { id: number; onChanged: () => void; 
               {app.noteBasis.valueSource ? ` (posting: "${app.noteBasis.valueSource}")` : ""}
             </p>
           )}
-          {editable && (
+          {editable && !app.recruiterNote && !note.trim() && (
             <button className="link text-sm" disabled={!!busy} onClick={() => act("note", () => api.redraftNote(app.id))}>
-              {busy === "note" ? "Writing…" : app.recruiterNote ? "Write it again" : "Write a note"}
+              {busy === "note" ? "Writing…" : "Write a note"}
             </button>
+          )}
+          {editable && (app.recruiterNote || note.trim()) && (
+            <NoteEditor
+              appId={app.id}
+              current={note}
+              onUse={(text, basis) => act("note", () => api.editApplication(app.id, { recruiterNote: text, noteBasis: basis }))}
+            />
           )}
         </section>
 

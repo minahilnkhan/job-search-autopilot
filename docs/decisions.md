@@ -217,3 +217,6 @@ Location outside the US was a hard fail because STEM OPT only covers US employme
 Any failed filter can be bypassed per job with **Continue anyway** (stored as `jobs.filter_override`). The failing reasons stay listed and the badge says "Continued anyway"; re-filtering (edits, the startup re-check) keeps the override; Undo puts the filters back in charge.
 
 Her fixed work-authorization answers are about the US. On a job abroad, a question about another country's right to work (or a generic one) is never auto-answered: it goes to "fill these yourself". Answering "Yes" to "right to work in the UK" would be false.
+
+### Recruiter note: tell it how to change, then choose
+"Write it again" rolled the dice on a whole new note. Now **Suggest an edit** takes her instructions (typed, or quick ideas like "Shorter" and "Lead with the Roblox HQ camp" that add to the box) and revises the current note, her unsaved edits included, changing only what she asked. The suggestion comes back beside her note with its Truth Check result; **Use this** saves it (and its "built around" basis), **Keep mine** discards it. A suggestion the Truth Check flags can't be used until she changes the instructions.

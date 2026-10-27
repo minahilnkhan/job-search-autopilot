@@ -12,6 +12,7 @@ import {
   overrideTruthCheck,
   prepareApplication,
   redraftNote,
+  suggestNote,
   rejectApplication,
   restartApplication,
   snoozeApplication,
@@ -101,6 +102,11 @@ export function applicationRoutes(app: FastifyInstance, db: DB, deps: PrepDeps) 
   });
 
   app.post("/api/applications/:id/note", async (req) => redraftNote(db, idParam.parse(req.params).id, deps));
+  // "Suggest an edit": a rewrite following your instructions, not saved until you use it.
+  app.post("/api/applications/:id/note/suggest", async (req) => {
+    const b = z.object({ instructions: z.string().trim().min(1).max(2000), currentNote: z.string().max(4000).nullable().optional() }).parse(req.body);
+    return suggestNote(db, idParam.parse(req.params).id, b.instructions, b.currentNote ?? null, deps);
+  });
   app.post("/api/applications/:id/restart", async (req) => restartApplication(db, idParam.parse(req.params).id, deps));
 
   app.get("/api/applications", async (req) => {
@@ -115,6 +121,7 @@ export function applicationRoutes(app: FastifyInstance, db: DB, deps: PrepDeps) 
     const body = z
       .object({
         recruiterNote: z.string().nullable().optional(),
+        noteBasis: z.object({ companyValue: z.string(), valueSource: z.string(), story: z.string(), standout: z.string() }).nullable().optional(),
         contact: z.string().min(1).optional(),
         answers: z.array(z.object({ index: z.number().int().min(0), answer: z.string() })).optional(),
         lines: z.array(z.object({ id: z.string(), text: z.string() })).optional(), // empty text = delete the line

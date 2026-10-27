@@ -101,7 +101,15 @@ export async function finalizeApplication(db: DB, id: number, deps: PrepDeps, no
 
 async function draftNote(
   db: DB,
-  args: { jobId: number; companyName: string; title: string; description: string; content: import("../../../shared/types").ResumeContent },
+  args: {
+    jobId: number;
+    companyName: string;
+    title: string;
+    description: string;
+    content: import("../../../shared/types").ResumeContent;
+    currentNote?: string | null;
+    instructions?: string | null;
+  },
   settings: Settings,
   deps: PrepDeps,
   now: Date
@@ -117,6 +125,8 @@ async function draftNote(
       description: args.description,
       resumeText: serializeResume(args.content),
       companyNotes: company?.notes ?? null,
+      currentNote: args.currentNote ?? null,
+      instructions: args.instructions ?? null,
     });
     recordUsage(db, { purpose: "note", model: r.model, usage: r.usage, jobId: args.jobId, now });
     return { note: r.note, basis: r.basis };
@@ -124,6 +134,33 @@ async function draftNote(
     if (err instanceof ScoreError && err.usage) recordUsage(db, { purpose: "note", model: settings.models.tailoring, usage: err.usage, jobId: args.jobId, now });
     return { problem: accountProblem(err) ?? (err as Error).message };
   }
+}
+
+/**
+ * "Suggest an edit": rewrite the note the way you describe. Returns a proposal
+ * with its Truth Check result; nothing is saved until you press Use this.
+ */
+export async function suggestNote(db: DB, id: number, instructions: string, currentNote: string | null, deps: PrepDeps, now = new Date()) {
+  loadEditable(db, id);
+  const detail = getApplication(db, id);
+  const n = await draftNote(
+    db,
+    {
+      jobId: detail.jobId,
+      companyName: detail.companyName,
+      title: detail.jobTitle,
+      description: detail.job.description,
+      content: detail.resume,
+      currentNote: currentNote ?? detail.recruiterNote,
+      instructions,
+    },
+    getSettings(db),
+    deps,
+    now
+  );
+  if ("problem" in n) throw new ConflictError(`Couldn't rewrite the note: ${n.problem}`);
+  const issues = runTruthCheck({ lines: [], recruiterNote: n.note }, deps.facts()).issues.filter((i) => i.severity === "fail");
+  return { note: n.note, basis: n.basis, issues: issues.map((i) => i.message) };
 }
 
 /** "Write it again": a fresh recruiter note, then the usual re-check. */
@@ -353,6 +390,7 @@ function loadEditable(db: DB, id: number) {
 
 export type ApplicationPatch = {
   recruiterNote?: string | null;
+  noteBasis?: NoteBasis | null;
   contact?: string;
   answers?: { index: number; answer: string }[];
   lines?: { id: string; text: string }[];
@@ -406,6 +444,7 @@ export async function editApplication(db: DB, id: number, patch: ApplicationPatc
   db.update(applications)
     .set({
       recruiterNote: patch.recruiterNote !== undefined ? patch.recruiterNote?.trim() || null : app.recruiterNote,
+      ...(patch.noteBasis !== undefined ? { noteBasis: patch.noteBasis } : {}),
       answers,
       truthOverride: null,
       lastActivityAt: now,

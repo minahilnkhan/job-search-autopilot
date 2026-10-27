@@ -356,6 +356,31 @@ describe("base resume first, notes for every application, restart, background pr
     expect((await req("PATCH", `/api/applications/${a.id}`, { lines: [{ id: "contact", text: "" }] })).status).toBe(409);
   });
 
+  it("Suggest an edit: rewrites the note the way you say, shows its Truth Check, and saves only when you use it", async () => {
+    const seen: { currentNote?: string | null; instructions?: string | null }[] = [];
+    setup({
+      getNoteWriter: () => ({
+        writer: async (input) => {
+          seen.push({ currentNote: input.currentNote, instructions: input.instructions });
+          const note = input.instructions?.includes("latency") ? "I cut search latency 60% at Acme Learning." : "Shorter note about the Word Splitter feature.";
+          return { note, basis: { companyValue: "Speed", valueSource: "", story: "Word Splitter", standout: "Teachers" }, model: "claude-sonnet-5-5", usage: { inputTokens: 1, outputTokens: 1, cacheReadTokens: 0, cacheWriteTokens: 0 } };
+        },
+      }),
+    });
+    await saveBases();
+    const jobId = await addJob("Software Engineer", "B");
+    const a = (await req("POST", "/api/applications", { jobId })).body;
+    const before = a.recruiterNote;
+    const s1 = (await req("POST", `/api/applications/${a.id}/note/suggest`, { instructions: "Make it shorter", currentNote: "My edited draft." })).body;
+    expect(seen.at(-1)).toEqual({ currentNote: "My edited draft.", instructions: "Make it shorter" });
+    expect(s1).toMatchObject({ note: "Shorter note about the Word Splitter feature.", issues: [] });
+    expect((await req("GET", `/api/applications/${a.id}`)).body.recruiterNote).toBe(before); // not saved yet
+    const s2 = (await req("POST", `/api/applications/${a.id}/note/suggest`, { instructions: "add my latency win" })).body;
+    expect(s2.issues.join(" ")).toMatch(/DO NOT CLAIM|inventory/);
+    const used = (await req("PATCH", `/api/applications/${a.id}`, { recruiterNote: s1.note, noteBasis: s1.basis })).body;
+    expect(used).toMatchObject({ recruiterNote: s1.note, noteBasis: { companyValue: "Speed" } });
+  });
+
   it("restart rebuilds from the current base and closes the old application", async () => {
     await saveBases();
     const jobId = await addJob("Software Engineer", "B");
