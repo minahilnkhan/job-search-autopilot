@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import type { JobListItem } from "../../shared/types";
-import { api } from "./lib/api";
+import { api, usd } from "./lib/api";
 import { AddJob } from "./pages/AddJob";
 import { Today } from "./pages/Today";
 import { Jobs } from "./pages/Jobs";
@@ -8,28 +8,41 @@ import { Companies } from "./pages/Companies";
 import { Settings } from "./pages/Settings";
 import { Review } from "./pages/Review";
 import { Resumes } from "./pages/Resumes";
-import { Tracker } from "./pages/Tracker";
+import { Applications } from "./pages/Applications";
 
 // Hash routing: a handful of pages don't need a router dependency.
-const ROUTES = [
+// Four places in the nav; everything else hangs off one of them.
+const NAV = [
   { path: "#/today", label: "Today" },
-  { path: "#/add", label: "Add a job" },
-  { path: "#/review", label: "Review" },
-  { path: "#/tracker", label: "Tracker" },
+  { path: "#/applications", label: "Applications" },
   { path: "#/jobs", label: "Jobs" },
-  { path: "#/resumes", label: "Resumes" },
-  { path: "#/companies", label: "Companies" },
   { path: "#/settings", label: "Settings" },
 ] as const;
-type Path = (typeof ROUTES)[number]["path"];
+const PAGES = ["#/today", "#/applications", "#/review", "#/jobs", "#/add", "#/settings", "#/settings/resumes", "#/settings/companies"] as const;
+type Page = (typeof PAGES)[number];
+// Old addresses still work.
+const MOVED: Record<string, string> = { "#/tracker": "#/applications?stage=submitted", "#/resumes": "#/settings/resumes", "#/companies": "#/settings/companies" };
+const SECTION: Record<Page, string> = {
+  "#/today": "#/today",
+  "#/applications": "#/applications",
+  "#/review": "#/applications",
+  "#/jobs": "#/jobs",
+  "#/add": "#/jobs",
+  "#/settings": "#/settings",
+  "#/settings/resumes": "#/settings",
+  "#/settings/companies": "#/settings",
+};
 
-function useHashRoute(): Path {
-  // "#/review?id=3" → route "#/review" (the page reads the id itself).
-  const read = () => {
-    const base = location.hash.split("?")[0];
-    return ROUTES.some((r) => r.path === base) ? (base as Path) : "#/today";
+function useHashRoute(): Page {
+  const read = (): Page => {
+    const base = location.hash.split("?")[0]!;
+    if (MOVED[base]) {
+      history.replaceState(null, "", MOVED[base]);
+      return read();
+    }
+    return (PAGES as readonly string[]).includes(base) ? (base as Page) : "#/today";
   };
-  const [route, setRoute] = useState<Path>(read);
+  const [route, setRoute] = useState<Page>(read);
   useEffect(() => {
     const onHash = () => {
       setRoute(read());
@@ -41,15 +54,25 @@ function useHashRoute(): Path {
   return route;
 }
 
+const SETTINGS_TABS = [
+  { path: "#/settings", label: "General" },
+  { path: "#/settings/resumes", label: "Resumes" },
+  { path: "#/settings/companies", label: "Companies" },
+] as const;
+
 export default function App() {
   const route = useHashRoute();
   const [jobs, setJobs] = useState<JobListItem[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [reviewCount, setReviewCount] = useState(0);
-  const loadReviewCount = useCallback(() => {
-    api.applications("review").then((a) => setReviewCount(a.length)).catch(() => {});
+  const [waiting, setWaiting] = useState(0);
+  const [spend, setSpend] = useState<number | null>(null);
+  const loadCounts = useCallback(() => {
+    api.summary().then((s) => setWaiting(s.review + s.blocked)).catch(() => {});
   }, []);
-  useEffect(loadReviewCount, [loadReviewCount, route]);
+  useEffect(loadCounts, [loadCounts, route]);
+  useEffect(() => {
+    api.monthSpend().then((m) => setSpend(m.costUsd)).catch(() => {});
+  }, [route]);
 
   const loadJobs = useCallback(() => {
     api
@@ -63,40 +86,51 @@ export default function App() {
   useEffect(loadJobs, [loadJobs]);
 
   return (
-    <div className="min-h-screen lg:grid lg:grid-cols-[220px_minmax(0,1fr)]">
-      <aside className="border-b border-line bg-surface lg:min-h-screen lg:border-r lg:border-b-0">
-        <div className="px-4 pt-4 pb-2 lg:px-5 lg:pt-6 lg:pb-6">
-          <p className="text-[17px] leading-tight font-bold">Job Search Autopilot</p>
-          <p className="text-sm text-ink-soft">Nothing is sent without your approval.</p>
+    <div className="min-h-screen">
+      <header className="border-b border-line bg-surface">
+        <div className="mx-auto flex min-h-16 max-w-[1120px] flex-wrap items-center justify-between gap-x-6 gap-y-2 px-4 py-3 sm:px-8">
+          <a href="#/today" className="flex items-center gap-2.5">
+            <span aria-hidden className="flex h-7 w-7 items-center justify-center rounded-lg bg-accent">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12l5 5L20 7" /></svg>
+            </span>
+            <span className="text-base font-semibold text-ink">Autopilot</span>
+          </a>
+          <nav className="flex flex-wrap gap-1" aria-label="Main">
+            {NAV.map((n) => {
+              const current = SECTION[route] === n.path;
+              return (
+                <a key={n.path} href={n.path} aria-current={current ? "page" : undefined}
+                  className={`rounded-full px-3.5 py-2 text-sm ${current ? "bg-accent-bg font-semibold text-accent-ink" : "font-medium text-ink-soft hover:text-ink"}`}>
+                  {n.label}
+                  {n.path === "#/applications" && waiting > 0 && <span className="ml-1.5 rounded-full bg-accent px-1.5 text-xs text-white">{waiting}</span>}
+                </a>
+              );
+            })}
+          </nav>
+          <span className="text-[13px] text-muted">{spend !== null ? `${usd(spend)} AI spend this month` : ""}</span>
         </div>
-        <nav className="flex gap-1 overflow-x-auto px-2 pb-2 lg:flex-col lg:px-3" aria-label="Main">
-          {ROUTES.map((r) => (
-            <a
-              key={r.path}
-              href={r.path}
-              aria-current={route === r.path ? "page" : undefined}
-              className={`shrink-0 rounded-md px-3 py-2 text-[15px] font-medium ${
-                route === r.path ? "bg-paper text-ink" : "text-ink-soft hover:text-ink"
-              }`}
-            >
-              {r.label}
-              {r.path === "#/jobs" && jobs.length > 0 && <span className="ml-1.5 text-ink-soft">{jobs.length}</span>}
-              {r.path === "#/review" && reviewCount > 0 && <span className="ml-1.5 rounded bg-accent px-1.5 text-sm text-white">{reviewCount}</span>}
-            </a>
-          ))}
-        </nav>
-      </aside>
+      </header>
 
-      <main className="px-4 py-6 sm:px-6 lg:px-10 lg:py-10">
-        {loadError && <p className="mb-6 rounded-md bg-fail-bg px-3 py-2 text-[15px] text-fail" role="alert">{loadError}</p>}
+      <main className="mx-auto max-w-[1120px] px-4 pt-10 pb-16 sm:px-8">
+        {loadError && <p className="mb-6 rounded-xl bg-fail-bg px-4 py-3 text-fail" role="alert">{loadError}</p>}
+        {SECTION[route] === "#/settings" && (
+          <nav className="mb-6 flex flex-wrap gap-2" aria-label="Settings sections">
+            {SETTINGS_TABS.map((t) => (
+              <a key={t.path} href={t.path} aria-current={route === t.path ? "page" : undefined}
+                className={`rounded-full px-4 py-2 text-sm ${route === t.path ? "bg-dark font-semibold text-white" : "border border-line bg-surface font-medium text-ink"}`}>
+                {t.label}
+              </a>
+            ))}
+          </nav>
+        )}
         {route === "#/today" && <Today onJobsChanged={loadJobs} />}
-        {route === "#/add" && <AddJob onSaved={loadJobs} />}
-        {route === "#/review" && <Review key={location.hash} onCountsChanged={loadReviewCount} />}
+        {route === "#/applications" && <Applications key={location.hash} onCountsChanged={loadCounts} />}
+        {route === "#/review" && <Review key={location.hash.replace(/&?stage=[a-z]+/, "")} onCountsChanged={loadCounts} />}
         {route === "#/jobs" && <Jobs jobs={jobs} setJobs={setJobs} />}
-        {route === "#/resumes" && <Resumes />}
-        {route === "#/tracker" && <Tracker />}
-        {route === "#/companies" && <Companies onJobsChanged={loadJobs} />}
+        {route === "#/add" && <AddJob onSaved={loadJobs} />}
         {route === "#/settings" && <Settings />}
+        {route === "#/settings/resumes" && <Resumes />}
+        {route === "#/settings/companies" && <Companies onJobsChanged={loadJobs} />}
       </main>
     </div>
   );

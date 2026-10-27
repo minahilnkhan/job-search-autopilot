@@ -12,7 +12,7 @@ export function PreparingTray({ items, onChanged }: { items: Preparing[]; onChan
       {busy.length > 0 && (
         <p>
           Preparing {busy.length} application{busy.length === 1 ? "" : "s"} ({busy.map((p) => p.companyName).join(", ")}). Each one shows up in{" "}
-          <a className="font-medium text-accent underline underline-offset-2" href="#/review">Review</a> when it's ready (under Needs fixes if the Truth Check flags something), usually within a minute.
+          <a className="font-medium text-accent underline underline-offset-2" href="#/applications">Review</a> when it's ready (under Needs fixes if the Truth Check flags something), usually within a minute.
         </p>
       )}
       {failed.map((p) => (
@@ -20,7 +20,7 @@ export function PreparingTray({ items, onChanged }: { items: Preparing[]; onChan
           <p className="text-fail">
             {p.jobTitle} at {p.companyName} couldn't be prepared: {p.error}{" "}
             {/base resume/i.test(p.error ?? "") && (
-              <a className="font-medium text-accent underline underline-offset-2" href="#/resumes">Open Resumes</a>
+              <a className="font-medium text-accent underline underline-offset-2" href="#/settings/resumes">Open Resumes</a>
             )}
           </p>
           <div className="flex gap-2">

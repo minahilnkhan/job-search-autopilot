@@ -12,6 +12,7 @@ export type FrameResult = {
   leftForYou: LeftForYou[];
   resumeUploaded: boolean;
   unanswered: FormControl[];
+  fields: { id: string; label: string; kind: string }[]; // every field, so chat edits can find theirs
 };
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -91,7 +92,7 @@ async function act(a: FillAction, file: File | null): Promise<boolean> {
 const cleanLabel = (s: string) => s.replace(/[✱*]\s*$/, "").replace(/\s+/g, " ").trim();
 
 async function fill(p: FillPayload): Promise<FrameResult> {
-  const result: FrameResult = { hasForm: false, filled: [], leftForYou: [], resumeUploaded: false, unanswered: [] };
+  const result: FrameResult = { hasForm: false, filled: [], leftForYou: [], resumeUploaded: false, unanswered: [], fields: [] };
   const controls = describeFields();
   if (!controls.some((c) => c.kind !== "file")) return result;
   result.hasForm = true;
@@ -114,6 +115,7 @@ async function fill(p: FillPayload): Promise<FrameResult> {
   }
   result.leftForYou.push(...rest.leftForYou, ...first.leftForYou.filter((l) => /file|cover letter/i.test(l.reason)));
   result.unanswered = rest.unanswered.map((c) => ({ ...c, label: cleanLabel(c.label) }));
+  result.fields = describeFields().map((c) => ({ id: c.id, label: cleanLabel(c.label), kind: c.kind }));
   return result;
 }
 
@@ -125,4 +127,11 @@ async function fillOne(id: string, value: string): Promise<boolean> {
   return a ? act(a, null) : false;
 }
 
-(window as unknown as { __autopilot: unknown }).__autopilot = { fill, fillOne };
+/** Attach the (re-made) resume again, after a chat edit changed it. */
+async function attachResume(p: FillPayload): Promise<boolean> {
+  const plan = planFill(describeFields(), { ...p.values, profile: { ...p.values.profile } });
+  const upload = plan.actions.find((a) => a.op === "upload");
+  return upload ? act(upload, resumeFile(p)) : false;
+}
+
+(window as unknown as { __autopilot: unknown }).__autopilot = { fill, fillOne, attachResume };

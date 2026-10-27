@@ -175,7 +175,7 @@ export function SubmitPanel({ app, onChanged }: { app: ApplicationDetail; onChan
         <p className="text-[15px] text-pass">
           Submitted {app.submittedAt ? new Date(app.submittedAt).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : ""}.
           {app.followUpDue ? ` Follow up on ${new Date(`${app.followUpDue}T12:00:00`).toLocaleDateString([], { month: "short", day: "numeric" })} if you haven't heard back.` : ""}{" "}
-          Track it on the <a className="font-medium text-accent underline underline-offset-2" href="#/tracker">Tracker</a>.
+          Track it on the <a className="font-medium text-accent underline underline-offset-2" href="#/applications?stage=submitted">Applications page</a>.
         </p>
         <button className="btn-quiet py-1" disabled={busy} onClick={() => run(async () => onChanged(await api.unmarkSubmitted(app.id)))}>
           Not actually submitted? Undo

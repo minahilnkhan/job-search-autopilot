@@ -77,7 +77,7 @@ export function AddJob({ onSaved }: { onSaved: () => void }) {
     return (
       <section className="max-w-3xl space-y-6">
         <header className="space-y-1">
-          <h1 className="text-2xl font-bold tracking-tight">{duplicate ? "Already saved" : "Saved"}</h1>
+          <h1 className="text-[34px] leading-tight font-semibold tracking-tight">{duplicate ? "Already saved" : "Saved"}</h1>
           <p className="text-ink-soft">
             {duplicate
               ? "This company, title and location were already saved. Here's the existing job; nothing new was added."
@@ -142,7 +142,7 @@ export function AddJob({ onSaved }: { onSaved: () => void }) {
   return (
     <section className="space-y-6">
       <header className="max-w-2xl space-y-1">
-        <h1 className="text-2xl font-bold tracking-tight">Add a job</h1>
+        <h1 className="text-[34px] leading-tight font-semibold tracking-tight">Add a job</h1>
         <p className="text-ink-soft">
           Paste a posting from anywhere, including LinkedIn. The app reads it, you check what it found, then it runs the hard filters.
         </p>

@@ -131,9 +131,9 @@ export function Companies({ onJobsChanged }: { onJobsChanged: () => void }) {
   }
 
   return (
-    <section className="max-w-4xl space-y-6">
+    <section className="space-y-6">
       <header className="space-y-1">
-        <h1 className="text-2xl font-bold tracking-tight">Companies</h1>
+        <h1 className="text-[34px] leading-tight font-semibold tracking-tight">Companies</h1>
         <p className="max-w-2xl text-ink-soft">
           STEM OPT only allows employers enrolled in E-Verify. There's no API for it, so look each company up once in the{" "}
           <a className="font-medium text-accent underline underline-offset-2" href={E_VERIFY_SEARCH_URL} target="_blank" rel="noreferrer">

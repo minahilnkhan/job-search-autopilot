@@ -42,7 +42,7 @@ export function AcceptButton({ jobId, tier, onDone, className = "btn-primary py-
       {typeof state === "object" && "error" in state && (
         <span className="text-[15px] text-fail">
           {state.error}{" "}
-          {/base resume/i.test(state.error) && <a className="font-medium text-accent underline underline-offset-2" href="#/resumes">Open Resumes</a>}
+          {/base resume/i.test(state.error) && <a className="font-medium text-accent underline underline-offset-2" href="#/settings/resumes">Open Resumes</a>}
         </span>
       )}
     </span>

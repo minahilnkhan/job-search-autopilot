@@ -104,7 +104,21 @@ export const api = {
   tracker: () => request<TrackedApplication[]>("GET", "/api/tracker"),
   setStatus: (id: number, status: TrackStatus) => request<ApplicationDetail>("POST", `/api/applications/${id}/status`, { status }),
   followUp: (id: number, action: "done" | "later") => request<ApplicationDetail>("POST", `/api/applications/${id}/follow-up`, { action }),
+  summary: () => request<DaySummary>("GET", "/api/summary"),
+  draftFollowUp: (id: number) => request<{ text: string; warning: string | null }>("POST", `/api/applications/${id}/follow-up/draft`, {}),
   monthSpend: () => request<{ month: string; calls: number; costUsd: number; unpricedCalls: number }>("GET", "/api/usage/month"),
+};
+
+export type DaySummary = {
+  date: string;
+  today: { submitted: number; target: number };
+  week: { submitted: number; target: number };
+  review: number;
+  blocked: number;
+  snoozed: number;
+  approved: number;
+  followUps: { due: number; next: { id: number; companyName: string; jobTitle: string } | null };
+  pipeline: { submitted: number; screen: number; interview: number; offer: number };
 };
 
 export type TrackStatus = "screen" | "interview" | "offer" | "rejected" | "ghosted" | "withdrawn";

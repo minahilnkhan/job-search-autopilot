@@ -4,7 +4,7 @@ import { buildApp } from "./app";
 import { createDb, runMigrations } from "./db/client";
 import { seed } from "./db/seed";
 import { config } from "./config";
-import { anthropicNoteFactory, anthropicAnswerFactory, anthropicScorerFactory, anthropicTailorFactory } from "./llm/factory";
+import { anthropicNoteFactory, anthropicAnswerFactory, anthropicChatFactory, anthropicFollowUpFactory, anthropicScorerFactory, anthropicTailorFactory } from "./llm/factory";
 import { makeRenderer } from "./render/renderer";
 import { loadTruthFacts } from "./services/truth";
 import { importBasesIfMissing } from "./services/resumes";
@@ -31,7 +31,7 @@ const pipeline: PipelineDeps = { fetchBoard, getScorer: anthropicScorerFactory }
 let reschedule = () => {};
 const prep: PrepDeps = { getTailor: anthropicTailorFactory, getNoteWriter: anthropicNoteFactory, renderer: makeRenderer({ chromiumPath: config.chromiumPath }), facts: loadTruthFacts };
 // Assisted submit opens a visible browser window on this machine.
-const submit: SubmitDeps = { openPage: headedBrowser(config.chromiumPath), getAnswerWriter: anthropicAnswerFactory, facts: loadTruthFacts };
+const submit: SubmitDeps = { openPage: headedBrowser(config.chromiumPath), getAnswerWriter: anthropicAnswerFactory, getChat: anthropicChatFactory, getFollowUp: anthropicFollowUpFactory, facts: loadTruthFacts };
 const app = buildApp(db, { logger: true, pipeline, prep, submit, onSettingsChanged: () => reschedule() });
 
 // Bind to localhost only: this is a personal tool with no auth.

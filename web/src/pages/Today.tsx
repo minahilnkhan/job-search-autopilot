@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { PipelineProgress, PipelineRun, Shortlist, ShortlistEntry } from "../../../shared/types";
 import { api, usd } from "../lib/api";
 import { ScoreBadge, ScoreBreakdownView } from "../components/Score";
+import type { DaySummary } from "../lib/api";
 import { PreparingTray, type Preparing } from "../components/PreparingTray";
 
 const EVERIFY_TEXT = { confirmed: "E-Verify confirmed", likely: "E-Verify likely", unknown: "E-Verify not checked" } as const;
@@ -26,12 +27,7 @@ function progressText(p: PipelineProgress | null): string {
 }
 
 /** One job, full detail. Drag it right to accept, left to skip. */
-function Card({ e, position, total, onDecide }: {
-  e: ShortlistEntry;
-  position: number;
-  total: number;
-  onDecide: (kind: "skip" | "accept") => void;
-}) {
+function Card({ e, onDecide, busy }: { e: ShortlistEntry; onDecide: (kind: "skip" | "accept") => void; busy: boolean }) {
   const [open, setOpen] = useState(false);
   const [dx, setDx] = useState(0);
   const start = useRef<{ x: number; y: number; id: number } | null>(null);
@@ -40,15 +36,13 @@ function Card({ e, position, total, onDecide }: {
   const checks = job.filterReasons.filter((r) => r.severity === "warn" && !["everify_unknown", "no_sponsorship"].includes(r.code));
   const posted = job.postedAt ? new Date(`${job.postedAt}T12:00:00`).toLocaleDateString([], { month: "short", day: "numeric" }) : null;
 
-  // Pointer drag, only from the card body (not its buttons and links).
   function down(ev: React.PointerEvent) {
     if ((ev.target as HTMLElement).closest("a,button")) return;
     start.current = { x: ev.clientX, y: ev.clientY, id: ev.pointerId };
     (ev.currentTarget as HTMLElement).setPointerCapture(ev.pointerId);
   }
   function move(ev: React.PointerEvent) {
-    if (!start.current) return;
-    setDx(ev.clientX - start.current.x);
+    if (start.current) setDx(ev.clientX - start.current.x);
   }
   function up() {
     if (!start.current) return;
@@ -57,17 +51,15 @@ function Card({ e, position, total, onDecide }: {
     else if (dx < -SWIPE_DISTANCE) onDecide("skip");
     setDx(0);
   }
-
   const hint = dx > 40 ? "accept" : dx < -40 ? "skip" : null;
+  const good = (t: string) => <span key={t} className="chip bg-pass-bg text-pass">{t}</span>;
+  const check = (t: string) => <span key={t} className="chip bg-warn-bg text-warn">{t}</span>;
 
   return (
     <article
       aria-label={`${job.title} at ${job.companyName}`}
-      className="panel relative touch-pan-y select-none shadow-sm"
-      style={{
-        transform: dx ? `translateX(${dx}px) rotate(${dx / 40}deg)` : undefined,
-        transition: start.current ? "none" : "transform 160ms ease-out",
-      }}
+      className="relative touch-pan-y space-y-4 rounded-xl border border-line p-6 select-none"
+      style={{ transform: dx ? `translateX(${dx}px) rotate(${dx / 40}deg)` : undefined, transition: start.current ? "none" : "transform 160ms ease-out", background: "white" }}
       onPointerDown={down}
       onPointerMove={move}
       onPointerUp={up}
@@ -77,89 +69,101 @@ function Card({ e, position, total, onDecide }: {
       }}
     >
       {hint && (
-        <span
-          className={`absolute top-4 rounded-md border-2 px-2 py-0.5 text-sm font-bold uppercase tracking-wide ${
-            hint === "accept" ? "left-4 border-pass text-pass" : "right-4 border-fail text-fail"
-          }`}
-        >
+        <span className={`absolute top-4 rounded-full border-2 px-3 py-0.5 text-sm font-bold tracking-wide uppercase ${hint === "accept" ? "left-4 border-accent text-accent" : "right-4 border-fail text-fail"}`}>
           {hint === "accept" ? "Accept" : "Skip"}
         </span>
       )}
-      <div className="space-y-3 p-5">
-        <p className="text-sm text-ink-soft">
-          {position} of {total} · Tier {job.tier}
-        </p>
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0 space-y-1">
-            <h2 className="text-xl font-bold tracking-tight">{job.title}</h2>
-            <p className="text-[15px] text-ink-soft">
-              {job.companyName}
-              {e.warmContact && <span className="text-accent"> (warm contact)</span>}
-              <span className="text-line"> / </span>
-              {[job.location ?? "Location not stated", posted && `posted ${posted}`].filter(Boolean).join(", ")}
-            </p>
-          </div>
-          <ScoreBadge score={job.fitScore} tier={job.tier} />
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h3 className="text-[22px] leading-tight font-semibold">{job.title}</h3>
+          <p className="mt-1">
+            {job.companyName}
+            {e.warmContact && <span className="text-accent"> · warm contact</span>}
+            {" · "}
+            {[job.location ?? "Location not stated", posted && `posted ${posted}`].filter(Boolean).join(" · ")}
+          </p>
         </div>
-        {b && <p className="text-[15px]">{b.whyFits}</p>}
-        {b && b.gaps.length > 0 && <p className="text-[15px] text-ink-soft">Gaps: {b.gaps.join("; ")}</p>}
-        {checks.map((r) => (
-          <p key={r.code} className="text-sm text-warn">Check: {r.message}</p>
-        ))}
-        <p className="text-sm text-ink-soft">
-          <span className={e.eVerify === "unknown" ? "text-warn" : ""}>{EVERIFY_TEXT[e.eVerify]}</span>
-          {", "}
-          <span className={job.sponsorshipStated === "no" ? "text-warn" : ""}>{SPONSOR_TEXT[job.sponsorshipStated]}</span>
-        </p>
-        <div className="flex flex-wrap gap-2 pt-1">
-          {job.url && <a className="btn-quiet py-1.5" href={job.url} target="_blank" rel="noreferrer">Open posting</a>}
-          {b && (
-            <button className="btn-quiet py-1.5" aria-expanded={open} onClick={() => setOpen((o) => !o)}>
-              {open ? "Hide score" : "Why this score"}
-            </button>
-          )}
-        </div>
+        <ScoreBadge score={job.fitScore} tier={job.tier} />
+      </div>
+      {b && <p className="text-ink">{b.whyFits}</p>}
+      <div className="flex flex-wrap gap-2">
+        {job.sponsorshipStated === "yes" && good("Sponsors visas")}
+        {job.sponsorshipStated === "no" && check("No sponsorship")}
+        {e.eVerify === "confirmed" && good("E-Verify confirmed")}
+        {e.eVerify === "likely" && good("E-Verify likely")}
+        {e.eVerify === "unknown" && check("E-Verify not checked")}
+        {b?.gaps.slice(0, 2).map((g) => check(`Gap: ${g}`))}
+        {checks.map((r) => check(r.message))}
+      </div>
+      <div className="flex flex-wrap items-center gap-3 pt-1">
+        <button className="btn-quiet" disabled={busy} onClick={() => onDecide("skip")}>← Skip</button>
+        <button className="btn-primary" disabled={busy} onClick={() => onDecide("accept")}>Accept and prepare →</button>
+        {b && (
+          <button className="link text-sm" aria-expanded={open} onClick={() => setOpen((o) => !o)}>
+            {open ? "Hide score" : "Why this score"}
+          </button>
+        )}
+        {job.url && <a className="link text-sm" href={job.url} target="_blank" rel="noreferrer">Posting</a>}
       </div>
       {open && b && (
-        <div className="border-t border-line p-5">
+        <div className="border-t border-line pt-4">
           <ScoreBreakdownView b={b} redFlags={job.redFlags} />
         </div>
       )}
-      <div className="grid grid-cols-2 gap-2 border-t border-line p-3">
-        <button className="btn-quiet" onClick={() => onDecide("skip")}>
-          <span aria-hidden>←</span> Skip
-        </button>
-        <button className="btn-primary" onClick={() => onDecide("accept")}>
-          Accept and prepare <span aria-hidden>→</span>
-        </button>
-      </div>
     </article>
+  );
+}
+
+function StepNumber({ n, state }: { n: number; state: "current" | "next" | "later" | "done" }) {
+  const style =
+    state === "current" ? "bg-accent text-white" : state === "done" ? "bg-pass-bg text-pass" : state === "next" ? "border-2 border-accent text-accent" : "border-2 border-line-strong text-muted";
+  return (
+    <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-semibold ${style}`} aria-hidden>
+      {state === "done" ? "✓" : n}
+    </span>
+  );
+}
+
+/** A collapsed step: one line, a count, one button. */
+function Step({ n, state, title, detail, action }: { n: number; state: "next" | "later" | "done"; title: string; detail: string; action?: React.ReactNode }) {
+  return (
+    <li className="panel flex flex-wrap items-center gap-4 px-7 py-5">
+      <StepNumber n={n} state={state} />
+      <div className="min-w-[220px] flex-1">
+        <h2 className="text-lg font-semibold">{title}</h2>
+        <p className="text-sm text-muted">{detail}</p>
+      </div>
+      {action}
+    </li>
   );
 }
 
 export function Today({ onJobsChanged }: { onJobsChanged: () => void }) {
   const [list, setList] = useState<Shortlist | null | undefined>(undefined);
+  const [summary, setSummary] = useState<DaySummary | null>(null);
   const [running, setRunning] = useState(false);
   const [progress, setProgress] = useState<PipelineProgress | null>(null);
   const [lastRun, setLastRun] = useState<PipelineRun | null>(null);
-  const [spend, setSpend] = useState<number | null>(null);
   const [preparing, setPreparing] = useState<Preparing[]>([]);
   const [last, setLast] = useState<LastAction | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
-    const [sl, runs, month, prep] = await Promise.all([api.getShortlist(), api.listRuns(), api.monthSpend(), api.preparing()]);
+    const [sl, runs, prep, sum] = await Promise.all([api.getShortlist(), api.listRuns(), api.preparing(), api.summary()]);
     setList(sl);
     setRunning(runs.running);
     setProgress(runs.progress);
     setLastRun(runs.runs[0] ?? null);
-    setSpend(month.costUsd);
     setPreparing(prep);
+    setSummary(sum);
     return runs.running;
   }, []);
-
-  const loadPreparing = useCallback(async () => setPreparing(await api.preparing()), []);
+  const refreshSide = useCallback(async () => {
+    const [prep, sum] = await Promise.all([api.preparing(), api.summary()]);
+    setPreparing(prep);
+    setSummary(sum);
+  }, []);
 
   useEffect(() => {
     load().catch((err) => setError((err as Error).message));
@@ -169,23 +173,19 @@ export function Today({ onJobsChanged }: { onJobsChanged: () => void }) {
   useEffect(() => {
     if (!running) return;
     const t = setInterval(async () => {
-      const stillRunning = await load();
-      if (!stillRunning) onJobsChanged();
+      if (!(await load())) onJobsChanged();
     }, 3000);
     return () => clearInterval(t);
   }, [running, load, onJobsChanged]);
 
-  // While applications are being prepared, check until they finish.
+  // While applications are being prepared, keep step 2's count current.
   const inFlight = preparing.some((p) => !p.error);
   useEffect(() => {
     if (!inFlight) return;
-    const t = setInterval(() => {
-      loadPreparing().then(onJobsChanged, () => {});
-    }, 4000);
+    const t = setInterval(() => refreshSide().catch(() => {}), 4000);
     return () => clearInterval(t);
-  }, [inFlight, loadPreparing, onJobsChanged]);
+  }, [inFlight, refreshSide]);
 
-  // The deck: undecided jobs only, Tier A first (the server already orders them).
   const deck = list?.entries.filter((e) => e.job.status === "new") ?? [];
   const current = deck[0];
 
@@ -194,14 +194,13 @@ export function Today({ onJobsChanged }: { onJobsChanged: () => void }) {
       if (!current || busy) return;
       setBusy(true);
       setError(null);
-      // Take it off the deck now; the server work happens behind it.
       setList((l) => l && { ...l, entries: l.entries.filter((x) => x.job.id !== current.job.id) });
       try {
         if (kind === "accept") await api.prepareInBackground(current.job.id);
         else await api.updateJob(current.job.id, { status: "dismissed" });
         setLast({ kind, entry: current });
-        setList(await api.refillShortlist()); // tops the deck back up
-        await loadPreparing();
+        setList(await api.refillShortlist());
+        await refreshSide();
         onJobsChanged();
       } catch (err) {
         setError((err as Error).message);
@@ -210,7 +209,7 @@ export function Today({ onJobsChanged }: { onJobsChanged: () => void }) {
         setBusy(false);
       }
     },
-    [current, busy, load, loadPreparing, onJobsChanged]
+    [current, busy, load, refreshSide, onJobsChanged]
   );
 
   async function undo() {
@@ -228,11 +227,9 @@ export function Today({ onJobsChanged }: { onJobsChanged: () => void }) {
     }
   }
 
-  // Arrow keys: → accept, ← skip (not while typing somewhere).
   useEffect(() => {
     function onKey(ev: KeyboardEvent) {
-      const t = ev.target as HTMLElement;
-      if (t.closest("input,textarea,select,[contenteditable]")) return;
+      if ((ev.target as HTMLElement).closest("input,textarea,select,[contenteditable]")) return;
       if (ev.key === "ArrowRight") decide("accept");
       else if (ev.key === "ArrowLeft") decide("skip");
     }
@@ -250,75 +247,159 @@ export function Today({ onJobsChanged }: { onJobsChanged: () => void }) {
     }
   }
 
+  const s = summary;
   const tierA = deck.filter((e) => e.job.tier === "A").length;
-  const tierB = deck.length - tierA;
+  const pickDone = list !== undefined && deck.length === 0;
+  const preparingNow = preparing.filter((p) => !p.error).length;
+  const dateLabel = new Date().toLocaleDateString([], { weekday: "long", month: "long", day: "numeric" });
+  const todayPct = s ? Math.min(100, Math.round((s.today.submitted / Math.max(1, s.today.target)) * 100)) : 0;
+  // Which collapsed step is "next": the first one with something waiting.
+  const nextStep = !s ? 0 : s.review + s.blocked > 0 ? 2 : s.approved > 0 ? 3 : s.followUps.due > 0 ? 4 : 0;
+  const stepState = (n: number, waiting: number): "next" | "later" | "done" => (waiting === 0 ? "done" : n === nextStep && pickDone ? "next" : "later");
 
   return (
-    <section className="max-w-2xl space-y-5">
-      <header className="flex flex-wrap items-end justify-between gap-4">
-        <div className="space-y-1">
-          <h1 className="text-2xl font-bold tracking-tight">Today's picks</h1>
-          <p className="text-ink-soft">
-            {deck.length > 0
-              ? `${tierA} Tier A and ${tierB} Tier B left. Swipe right or press → to accept, left or ← to skip.`
-              : "Your best-fit jobs, one at a time."}
-          </p>
+    <div className="space-y-8">
+      <section className="flex flex-wrap items-end justify-between gap-6">
+        <div>
+          <p className="eyebrow">{dateLabel}</p>
+          <h1 className="mt-1.5 text-[40px] leading-tight font-semibold tracking-tight">
+            {s ? `${s.today.submitted} of ${s.today.target} applications today` : "Today"}
+          </h1>
+          <p className="mt-2 text-[17px]">Four steps. Work top to bottom; each one tells you when it's done.</p>
         </div>
-        {running ? (
-          <button
-            className="btn-quiet"
-            disabled={progress?.stopRequested}
-            onClick={async () => {
-              await api.stopPipeline();
-              setProgress((p) => p && { ...p, stopRequested: true });
-            }}
-          >
-            {progress?.stopRequested ? "Stopping…" : "Stop"}
-          </button>
-        ) : (
-          <button className="btn-quiet" onClick={runNow} title="Fetch new postings from your companies and score them">
-            Check for new postings
-          </button>
+        {s && (
+          <div className="min-w-[260px] space-y-2">
+            <div className="h-2 overflow-hidden rounded-full bg-line" role="progressbar" aria-valuenow={todayPct} aria-valuemin={0} aria-valuemax={100} aria-label="Today's applications">
+              <div className="h-2 rounded-full bg-accent" style={{ width: `${todayPct}%` }} />
+            </div>
+            <p className="text-sm text-muted">Week: {s.week.submitted} of {s.week.target} applications</p>
+          </div>
         )}
-      </header>
+      </section>
 
-      <div className="space-y-1 text-[15px] text-ink-soft" role="status">
-        {running && <p className="text-ink">{progressText(progress)}</p>}
-        {!running && lastRun && <p>{runSummary(lastRun)}</p>}
-        {!running && lastRun?.message && (
-          <p className={lastRun.status === "failed" ? "text-fail" : "text-warn"}>{lastRun.message}</p>
-        )}
-        {spend !== null && <p>AI spend this month: {usd(spend)}</p>}
-        {error && <p className="text-fail">{error}</p>}
-      </div>
+      {error && <p className="rounded-xl bg-fail-bg px-4 py-3 text-fail" role="alert">{error}</p>}
 
-      <PreparingTray items={preparing} onChanged={() => load().catch(() => {})} />
-
-      {last && (
-        <p className="flex flex-wrap items-center gap-2 text-[15px] text-ink-soft">
-          {last.kind === "skip" ? (
-            <>
-              Skipped {last.entry.job.title} at {last.entry.job.companyName}.
-              <button className="btn-quiet py-1" disabled={busy} onClick={undo}>Undo</button>
-            </>
+      <section className="flex flex-wrap items-start gap-6">
+        <ol className="flex min-w-0 flex-[999_1_640px] flex-col gap-3">
+          {/* Step 1: the deck, open until it's empty. */}
+          {!pickDone ? (
+            <li className="panel-raised space-y-5 p-7">
+              <div className="flex items-center gap-3.5">
+                <StepNumber n={1} state="current" />
+                <div className="flex-1">
+                  <h2 className="text-xl font-semibold">Pick today's jobs</h2>
+                  <p className="text-sm text-muted">
+                    {deck.length} left{tierA ? ` · ${tierA} Tier A first` : ""} · swipe or use ← →
+                  </p>
+                </div>
+              </div>
+              {last && (
+                <p className="flex flex-wrap items-center gap-2 text-sm text-muted">
+                  {last.kind === "skip" ? (
+                    <>
+                      Skipped {last.entry.job.title} at {last.entry.job.companyName}.
+                      <button className="link" disabled={busy} onClick={undo}>Undo</button>
+                    </>
+                  ) : (
+                    <>Accepted {last.entry.job.title} at {last.entry.job.companyName}. It's being prepared for review.</>
+                  )}
+                </p>
+              )}
+              {current ? <Card key={current.job.id} e={current} onDecide={decide} busy={busy} /> : <p className="text-muted">Loading…</p>}
+            </li>
           ) : (
-            <>Accepted {last.entry.job.title} at {last.entry.job.companyName}. It's being prepared for Review.</>
+            <Step
+              n={1}
+              state="done"
+              title="Pick today's jobs"
+              detail={list ? "Done. New postings arrive with the daily check." : "No picks yet. The first check runs at your scheduled time."}
+              action={!running && <button className="btn-quiet" onClick={runNow}>Check for new postings</button>}
+            />
           )}
-        </p>
-      )}
 
-      {list === undefined ? null : current ? (
-        <Card key={current.job.id} e={current} position={1} total={deck.length} onDecide={decide} />
-      ) : (
-        <div className="rounded-lg border border-dashed border-line p-6">
-          <p className="font-medium">{list ? "You've gone through every pick" : "No picks yet"}</p>
-          <p className="mt-1 text-[15px] text-ink-soft">
-            {list
-              ? "Nothing scored Tier A or B is left to decide on. New postings come in with the daily run, or press Check for new postings. You can add companies on the Companies page or change how many picks you get in Settings."
-              : "The first run happens at your scheduled time, or press Check for new postings."}
-          </p>
-        </div>
-      )}
-    </section>
+          <Step
+            n={2}
+            state={stepState(2, (s?.review ?? 0) + (s?.blocked ?? 0) + preparingNow)}
+            title="Review and approve"
+            detail={
+              s
+                ? [`${s.review} ready`, s.blocked && `${s.blocked} need${s.blocked === 1 ? "s" : ""} a fix`, preparingNow && `${preparingNow} still preparing`].filter(Boolean).join(" · ")
+                : "…"
+            }
+            action={
+              s && s.review + s.blocked > 0 ? (
+                <a className={nextStep === 2 && pickDone ? "btn-dark" : "btn-quiet"} href={`#/applications?stage=${s.review ? "review" : "blocked"}`}>Start reviewing →</a>
+              ) : undefined
+            }
+          />
+          <Step
+            n={3}
+            state={stepState(3, s?.approved ?? 0)}
+            title="Submit"
+            detail={s ? (s.approved ? `${s.approved} approved · open each in Chrome and press Fill` : "Nothing approved yet") : "…"}
+            action={s && s.approved > 0 ? <a className={nextStep === 3 && pickDone ? "btn-dark" : "btn-quiet"} href="#/applications?stage=approved">Open the next one →</a> : undefined}
+          />
+          <Step
+            n={4}
+            state={stepState(4, s?.followUps.due ?? 0)}
+            title="Follow up"
+            detail={s ? (s.followUps.next ? `${s.followUps.due} due · ${s.followUps.next.companyName}, ${s.followUps.next.jobTitle}` : "Nothing due") : "…"}
+            action={s && s.followUps.due > 0 ? <a className={nextStep === 4 && pickDone ? "btn-dark" : "btn-quiet"} href="#/applications?stage=submitted">See follow-ups →</a> : undefined}
+          />
+          <PreparingTray items={preparing.filter((p) => p.error)} onChanged={() => load().catch(() => {})} />
+        </ol>
+
+        <aside className="flex flex-[1_1_280px] flex-col gap-3">
+          <div className="space-y-2.5 rounded-2xl bg-dark p-6 text-[#C9D8D2]">
+            <p className="text-[13px] font-semibold tracking-wider text-[#8FD9C8] uppercase">New postings</p>
+            {running ? (
+              <>
+                <p className="text-lg font-semibold text-white">Checking now</p>
+                <p className="text-sm">{progressText(progress)}</p>
+                <button
+                  className="rounded-full border border-white/25 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+                  disabled={progress?.stopRequested}
+                  onClick={async () => {
+                    await api.stopPipeline();
+                    setProgress((p) => p && { ...p, stopRequested: true });
+                  }}
+                >
+                  {progress?.stopRequested ? "Stopping…" : "Stop"}
+                </button>
+              </>
+            ) : (
+              <>
+                <p className="text-lg font-semibold text-white">
+                  {lastRun ? `Checked ${new Date(lastRun.finishedAt ?? lastRun.startedAt).toLocaleString([], { weekday: "short", hour: "numeric", minute: "2-digit" })}` : "Not checked yet"}
+                </p>
+                {lastRun && <p className="text-sm">{runSummary(lastRun).replace(/^Last run [^:]+: /, "")}</p>}
+                {lastRun?.message && <p className="text-sm text-[#FBD38D]">{lastRun.message}</p>}
+                <button className="rounded-full border border-white/25 px-4 py-2 text-sm font-semibold text-white" onClick={runNow}>Check now</button>
+              </>
+            )}
+          </div>
+          {s && (
+            <div className="panel space-y-3 p-6">
+              <p className="text-[13px] font-semibold tracking-wider text-muted uppercase">Pipeline</p>
+              <div className="grid grid-cols-2 gap-4">
+                {(
+                  [
+                    ["submitted", s.pipeline.submitted + s.pipeline.screen + s.pipeline.interview + s.pipeline.offer],
+                    ["recruiter screens", s.pipeline.screen],
+                    ["interviewing", s.pipeline.interview],
+                    ["offers", s.pipeline.offer],
+                  ] as const
+                ).map(([label, n]) => (
+                  <div key={label}>
+                    <p className="text-[28px] leading-tight font-semibold text-ink">{n}</p>
+                    <p className="text-[13px]">{label}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </aside>
+      </section>
+    </div>
   );
 }

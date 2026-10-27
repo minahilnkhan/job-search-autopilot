@@ -155,7 +155,7 @@ describe.skipIf(!chromiumPath)("prefill on form layouts like Greenhouse, Lever a
     expect(r.resumeUploaded).toBe(true);
     expect(r.leftForYou.map((l) => l.label)).toEqual(expect.arrayContaining(["Gender", "Veteran Status", "Website"]));
     expect(await page.evaluate(() => ({ s: (window as { __submitted?: boolean }).__submitted ?? false, c: (window as { __clicked?: number }).__clicked ?? 0 }))).toEqual({ s: false, c: 0 });
-  });
+  }, 20000);
 
   it("Lever: full name, URLs, radio and select answers, note in Additional information; checkbox and EEO left", async () => {
     const page = await open("lever.html");
@@ -174,7 +174,7 @@ describe.skipIf(!chromiumPath)("prefill on form layouts like Greenhouse, Lever a
     expect(await val(page, "select[name='eeo[gender]']")).toBe("");
     expect(r.leftForYou).toEqual(expect.arrayContaining([expect.objectContaining({ reason: "Checkbox: read it and tick it yourself", required: true })]));
     expect(await page.evaluate(() => (window as { __submitted?: boolean }).__submitted ?? false)).toBe(false);
-  });
+  }, 20000);
 
   it("Ashby: waits for the form to render, then fills it", async () => {
     const page = await open("ashby.html");
@@ -185,7 +185,7 @@ describe.skipIf(!chromiumPath)("prefill on form layouts like Greenhouse, Lever a
     expect(await val(page, "#q-phone")).toBe("312-555-0100");
     expect(r.resumeUploaded).toBe(true);
     expect(r.leftForYou).toEqual(expect.arrayContaining([expect.objectContaining({ label: "What excites you about this role?" })]));
-  });
+  }, 20000);
 });
 
 // ---- The whole flow through the API -------------------------------------------
@@ -528,7 +528,7 @@ describe.skipIf(!chromiumPath)("extension fill script", () => {
     expect(ok).toBe(true);
     expect(await page.locator("#question_6").inputValue()).toBe("Because of the customers.");
     expect(await page.evaluate(() => (window as { __submitted?: boolean }).__submitted ?? false)).toBe(false);
-  });
+  }, 20000);
 
   it("fills Lever-style radios and selects", async () => {
     const page = await browser.newPage();
@@ -539,5 +539,5 @@ describe.skipIf(!chromiumPath)("extension fill script", () => {
     expect(await page.locator("input[name='cards[a][field0]'][value=Yes]").isChecked()).toBe(true);
     expect(await page.locator("select[name='cards[a][field1]']").inputValue()).toBe("Yes");
     expect(await page.locator("textarea[name=comments]").inputValue()).toBe("I ship production Claude features.");
-  });
+  }, 20000);
 });

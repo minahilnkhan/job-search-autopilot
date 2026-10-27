@@ -62,9 +62,20 @@ The **resume** is one structure rendered two ways: Chromium prints the HTML temp
 
 The **Review** page shows the job, its score and gaps, each resume change as before → after, a PDF preview, the note and the answers, all editable inline. Actions: **Approve** (one application at a time), **Not applying** (with a reason, kept for tuning scoring), **Snooze**.
 
+## How a day works
+
+The app is four places: **Today**, **Applications**, **Jobs** and **Settings** (with Resumes and Companies inside it). Today is a four-step checklist:
+
+1. **Pick today's jobs**: a deck of Tier A then Tier B picks. Swipe or use ← → to accept or skip.
+2. **Review and approve**: one application at a time, with ‹ › to the next. What changed in the resume, the Truth Check result and the recruiter note up front; answers and the score folded away.
+3. **Submit**: open each approved application in Chrome and press **Fill** in the extension.
+4. **Follow up**: Tier A applications a week after submitting, with **Draft a follow-up**.
+
+**Applications** merges the review queue and the tracker: To review, Needs a fix, Ready to submit, Submitted, Interviewing, Closed.
+
 ## Filling forms in your own Chrome
 
-The recommended way to apply is the **Chrome extension** in [`extension/`](extension/README.md). You open the job in your normal Chrome, click the extension, and press **Fill this form**. It pulls the approved application from the app (contact details, resume PDF, prepared and drafted answers) and fills the page using the same matching rules as below. It asks you in its side panel about anything only you can answer, and records the submission when you press **I submitted it**. Because it's your real browser, sites that block automated browsers (like Ashby) work normally. It only acts when you press Fill, and it never submits.
+The recommended way to apply is the **Chrome extension** in [`extension/`](extension/README.md). You open the job in your normal Chrome, click the extension, and press **Fill this form**. It pulls the approved application from the app (contact details, resume PDF, prepared and drafted answers) and fills the page using the same matching rules as below. It asks you in its side panel about anything only you can answer, and records the submission when you press **I submitted it**. Its **Chat** tab takes requests like "shorten Why Anthropic to two sentences": it proposes edits to resume lines, answers or the note, the Truth Check filters them, and **Apply** updates the application and the open form (and re-attaches the resume if it changed). An approved application stays approved only if it still passes and fits on one page. Because it's your real browser, sites that block automated browsers (like Ashby) work normally. It only acts when you press Fill, and it never submits.
 
 The extension proves it's yours with a pairing code from Settings. The server also refuses requests addressed to any host other than localhost, so a web page can't use DNS tricks to read your data.
 

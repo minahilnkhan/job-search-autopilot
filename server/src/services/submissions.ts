@@ -15,6 +15,7 @@ import type { Frame } from "playwright";
 import { runTruthCheck } from "../domain/truthCheck";
 import type { InventoryFacts } from "../domain/inventory";
 import type { AnswerWriter } from "../llm/answers";
+import type { ChatWriter, FollowUpWriter } from "../llm/chat";
 import { ScoreError } from "../llm/scoreJob";
 import { accountProblem } from "../llm/errors";
 import { recordUsage } from "./usage";
@@ -35,6 +36,9 @@ export type SubmitDeps = {
   getAnswerWriter?: (s: Settings) => { writer: AnswerWriter } | { unavailable: string };
   /** Inventory facts for the Truth Check on drafted answers. */
   facts?: () => InventoryFacts;
+  /** The extension's chat, and Tracker follow-up drafts. */
+  getChat?: (s: Settings) => { writer: ChatWriter } | { unavailable: string };
+  getFollowUp?: (s: Settings) => { writer: FollowUpWriter } | { unavailable: string };
   watchEveryMs?: number;
 };
 

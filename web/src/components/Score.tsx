@@ -1,17 +1,16 @@
 import type { ScoreBreakdown, Tier } from "../../../shared/types";
 
 const TIER_STYLE: Record<Tier, string> = {
-  A: "bg-accent text-white",
-  B: "bg-ink/10 text-ink",
-  skip: "bg-line/60 text-ink-soft",
+  A: "bg-accent-bg text-accent-ink",
+  B: "bg-paper text-ink-soft",
+  skip: "bg-paper text-muted",
 };
 
 export function ScoreBadge({ score, tier }: { score: number | null; tier: Tier | null }) {
   if (score === null || tier === null) return null;
   return (
-    <span className={`inline-flex shrink-0 items-baseline gap-1.5 rounded-md px-2 py-1 text-sm font-semibold ${TIER_STYLE[tier]}`}>
-      {tier === "skip" ? "Skip" : `Tier ${tier}`}
-      <span className="font-medium opacity-80">{score}/10</span>
+    <span className={`inline-flex shrink-0 items-baseline gap-1 rounded-full px-3 py-1 text-[13px] font-semibold ${TIER_STYLE[tier]}`}>
+      {tier === "skip" ? "Skip" : `Tier ${tier}`} · {score}/10
     </span>
   );
 }

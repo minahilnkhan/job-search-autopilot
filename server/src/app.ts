@@ -54,6 +54,6 @@ export function buildApp(
   pipelineRoutes(app, db, opts.pipeline);
   applicationRoutes(app, db, opts.prep);
   submissionRoutes(app, db, opts.submit);
-  extensionRoutes(app, db, opts.submit);
+  extensionRoutes(app, db, opts.submit, opts.prep);
   return app;
 }

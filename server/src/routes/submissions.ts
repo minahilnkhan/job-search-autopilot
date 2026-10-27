@@ -2,6 +2,8 @@ import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import type { DB } from "../db/client";
 import { ConflictError } from "../services/jobs";
+import { daySummary } from "../services/summary";
+import { draftFollowUp } from "../services/chat";
 import {
   answerAsk,
   getSubmitSession,
@@ -33,6 +35,11 @@ export function submissionRoutes(app: FastifyInstance, db: DB, deps: SubmitDeps 
   app.post("/api/applications/:id/unsubmit", async (req) => unmarkSubmitted(db, idParam.parse(req.params).id));
 
   app.get("/api/tracker", async () => listTracked(db));
+  app.get("/api/summary", async () => daySummary(db));
+  app.post("/api/applications/:id/follow-up/draft", async (req) => {
+    if (!deps) throw new ConflictError("Follow-up drafts aren't available in this setup.");
+    return draftFollowUp(db, idParam.parse(req.params).id, deps);
+  });
   app.post("/api/applications/:id/status", async (req) => {
     const { status } = z.object({ status: z.enum(["screen", "interview", "offer", "rejected", "ghosted", "withdrawn"]) }).parse(req.body);
     return setTrackedStatus(db, idParam.parse(req.params).id, status);

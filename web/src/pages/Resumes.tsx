@@ -57,7 +57,7 @@ export function Resumes() {
   return (
     <section className="space-y-5">
       <header className="max-w-2xl space-y-1">
-        <h1 className="text-2xl font-bold tracking-tight">Base resumes</h1>
+        <h1 className="text-[34px] leading-tight font-semibold tracking-tight">Base resumes</h1>
         <p className="text-ink-soft">
           Every application starts from one of these. Tier A applications get tailored line by line; Tier B use them as-is. Each save
           runs the Truth Check and rebuilds the one-page PDF.
@@ -67,7 +67,7 @@ export function Resumes() {
       <nav className="flex gap-1" aria-label="Base resume">
         {(["fde", "swe"] as const).map((t) => (
           <button key={t} onClick={() => switchTo(t)} aria-pressed={type === t}
-            className={`rounded-md px-3 py-1.5 text-[15px] font-medium ${type === t ? "bg-ink text-white" : "text-ink-soft hover:bg-surface"}`}>
+            className={`rounded-full px-4 py-2 text-sm ${type === t ? "bg-dark font-semibold text-white" : "border border-line bg-surface font-medium text-ink"}`}>
             {LABEL[t]}
           </button>
         ))}

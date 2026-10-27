@@ -92,7 +92,7 @@ export function Settings() {
   return (
     <form onSubmit={save} className="max-w-3xl space-y-6">
       <header className="space-y-1">
-        <h1 className="text-2xl font-bold tracking-tight">Settings</h1>
+        <h1 className="text-[34px] leading-tight font-semibold tracking-tight">Settings</h1>
         <p className="text-ink-soft">Targets and fixed answers the rest of the app reads from.</p>
       </header>
 

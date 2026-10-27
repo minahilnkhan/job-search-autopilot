@@ -104,7 +104,7 @@ function JobRow({ job, onChange, selected, onSelect }: { job: JobListItem; onCha
                   <AcceptButton jobId={job.id} tier={job.tier} className="btn-quiet" onDone={() => api.getJob(job.id).then(onChange)} />
                 )
               ) : (
-                <a className="btn-quiet" href="#/review">Open in Review</a>
+                <a className="btn-quiet" href="#/applications">Open in Review</a>
               )}
               {job.status !== "dismissed" ? (
                 <button className="btn-quiet" onClick={() => update({ status: "dismissed" })}>Dismiss</button>
@@ -178,10 +178,10 @@ export function Jobs({ jobs, setJobs }: { jobs: JobListItem[]; setJobs: (fn: (j:
   }
 
   return (
-    <section className="max-w-4xl space-y-5">
+    <section className="space-y-5">
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Jobs</h1>
+          <h1 className="text-[34px] leading-tight font-semibold tracking-tight">Jobs</h1>
           <p className="text-ink-soft">Everything saved or fetched, best score first, with why it passed or failed.</p>
         </div>
         <a className="btn-primary" href="#/add">Add a job</a>
@@ -199,7 +199,7 @@ export function Jobs({ jobs, setJobs }: { jobs: JobListItem[]; setJobs: (fn: (j:
                 setConfirming(false);
               }}
               aria-pressed={view === v.id}
-              className={`rounded-md px-3 py-1.5 text-[15px] font-medium ${view === v.id ? "bg-ink text-white" : "text-ink-soft hover:bg-surface"}`}
+              className={`rounded-full px-4 py-2 text-sm ${view === v.id ? "bg-dark font-semibold text-white" : "border border-line bg-surface font-medium text-ink"}`}
             >
               {v.label} {n !== undefined && <span className="opacity-70">{n}</span>}
             </button>

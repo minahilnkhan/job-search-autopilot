@@ -199,3 +199,14 @@ Sites like Ashby block the app's automated window. Making that window look human
 - **Pairing code.** Extension requests carry a random code from Settings (compared in constant time); a new code unpairs the old one. **Host check.** The server answers only requests addressed to localhost, which blocks DNS rebinding.
 - **Permissions.** Greenhouse, Lever and Ashby up front; other sites only after "Allow on this site" (optional host permission requested on her click).
 - **Dropdowns.** It picks the option that starts with the whole answer ("United States") before any option merely containing the typed word, so "United" doesn't land on United Arab Emirates.
+
+## Redesign
+
+### Four places, one next step
+The sidebar of eight pages became four: Today, Applications, Jobs, Settings (Resumes and Companies inside it). Today is a numbered checklist (pick, review, submit, follow up) driven by `/api/summary`; the current step is open and every other step is one line with a count and one button. Review and Tracker merged into Applications with stage tabs in the order you work. Scores, every resume line, reports and the copy panel stay folded until asked for. Old addresses (`#/tracker`, `#/resumes`, `#/companies`) redirect.
+
+### Look
+Inspired by Stripe's calm, airy style, not copied: Inter instead of Stripe's licensed face, and a palette of our own (green-black type, one teal accent, sage-white ground, white cards with soft layered shadows, pill buttons). Tokens live in `web/src/index.css` and are mirrored in the extension's `panel.css`.
+
+### Chat edits are proposals, checked in code, applied on your click
+The extension's Chat sends the request, the application (resume lines by id, answers, note, posting) and the form's questions to Sonnet, which returns edits. Code Truth-Checks each edit and drops the ones that fail, saying why; work-authorization answers can't be changed. Nothing changes until Apply. Applying to an approved application un-approves it, saves the edits, re-runs the Truth Check and the one-page check, and re-approves only if both pass; otherwise it lands in Needs a fix with the reason. The extension then types changed answers into the open form and re-attaches the resume if it changed. That keeps "nothing leaves without my approval": she approves the change by pressing Apply, and the checks still gate it.

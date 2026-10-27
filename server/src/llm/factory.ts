@@ -5,6 +5,7 @@ import { makeAnthropicScorer } from "./scoreJob";
 import { makeAnthropicTailor, type Tailor } from "./tailor";
 import { makeAnthropicNoteWriter, type NoteWriter } from "./note";
 import { makeAnthropicAnswerWriter, type AnswerWriter } from "./answers";
+import { makeAnthropicChat, makeAnthropicFollowUp, type ChatWriter, type FollowUpWriter } from "./chat";
 import type { Settings } from "../../../shared/types";
 
 /** Real scorer, or a plain-words reason it can't run yet. */
@@ -51,6 +52,28 @@ export function anthropicAnswerFactory(settings: Settings): { writer: AnswerWrit
   try {
     const context = loadMentorContext();
     return { writer: makeAnthropicAnswerWriter({ apiKey: config.anthropicApiKey, model: settings.models.tailoring, context }) };
+  } catch (err) {
+    if (err instanceof MissingContextError) return { unavailable: err.message };
+    throw err;
+  }
+}
+
+/** The extension's chat (tailoring model), or why it can't run. */
+export function anthropicChatFactory(settings: Settings): { writer: ChatWriter } | { unavailable: string } {
+  if (!config.anthropicApiKey) return { unavailable: "no ANTHROPIC_API_KEY in .env" };
+  try {
+    return { writer: makeAnthropicChat({ apiKey: config.anthropicApiKey, model: settings.models.tailoring, context: loadMentorContext() }) };
+  } catch (err) {
+    if (err instanceof MissingContextError) return { unavailable: err.message };
+    throw err;
+  }
+}
+
+/** Follow-up drafts for the Tracker (tailoring model), or why it can't run. */
+export function anthropicFollowUpFactory(settings: Settings): { writer: FollowUpWriter } | { unavailable: string } {
+  if (!config.anthropicApiKey) return { unavailable: "no ANTHROPIC_API_KEY in .env" };
+  try {
+    return { writer: makeAnthropicFollowUp({ apiKey: config.anthropicApiKey, model: settings.models.tailoring, context: loadMentorContext() }) };
   } catch (err) {
     if (err instanceof MissingContextError) return { unavailable: err.message };
     throw err;

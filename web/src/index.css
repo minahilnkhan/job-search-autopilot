@@ -1,33 +1,50 @@
 @import "tailwindcss";
 
-/* Design tokens. One idea carries the UI: every verdict shows the JD text that
-   caused it, marked like a highlighter. Everything else stays quiet. */
+/* Design tokens (see the redesign canvas, "Look and feel"): a sage-white
+   page, white cards with soft shadows, green-black type, one teal accent,
+   pill buttons. One primary button per screen: the next step. */
 @theme {
-  --font-sans: "Public Sans", ui-sans-serif, system-ui, sans-serif;
-  --font-serif: "Source Serif 4", ui-serif, Georgia, serif;
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  /* Resume text and evidence stay in the sans face too; serif is only kept as a name for old classes. */
+  --font-serif: "Inter", ui-sans-serif, system-ui, sans-serif;
 
-  --color-ink: #1d2433;
-  --color-ink-soft: #4a5468;
-  --color-paper: #f3f5f8;
+  --color-ink: #10231f;
+  --color-ink-soft: #3f524d;
+  --color-muted: #5f7069;
+  --color-paper: #f4f6f2;
   --color-surface: #ffffff;
-  --color-line: #d5dbe4;
-  --color-accent: #2f4bd8;
-  --color-accent-ink: #1f35a8;
-  --color-pass: #1f7a4d;
-  --color-pass-bg: #e3f3ea;
-  --color-fail: #b42318;
-  --color-fail-bg: #fdecea;
-  --color-warn: #8a5600;
-  --color-warn-bg: #fdf3dc;
-  --color-mark: #ffe58a;
+  --color-line: #e1e6df;
+  --color-line-strong: #bcc7c1;
+  --color-accent: #0e7c6b;
+  --color-accent-ink: #0a5f52;
+  --color-accent-bg: #e2f2ee;
+  --color-dark: #10231f;
+  --color-pass: #2e6b1f;
+  --color-pass-bg: #ecf5e6;
+  --color-fail: #b3123a;
+  --color-fail-bg: #ffebee;
+  --color-warn: #8a4b08;
+  --color-warn-bg: #fff4e5;
+  --color-mark: #fde68a;
+
+  --shadow-card: 0 1px 2px rgba(16, 35, 31, 0.06);
+  --shadow-raised: 0 1px 2px rgba(16, 35, 31, 0.06), 0 12px 32px -12px rgba(16, 35, 31, 0.18);
 }
 
 @layer base {
   html {
     background: var(--color-paper);
-    color: var(--color-ink);
+    color: var(--color-ink-soft);
     font-family: var(--font-sans);
+    font-size: 15px;
+    line-height: 1.55;
     -webkit-font-smoothing: antialiased;
+  }
+  h1,
+  h2,
+  h3 {
+    color: var(--color-ink);
+    letter-spacing: -0.01em;
   }
   :focus-visible {
     outline: 2px solid var(--color-accent);
@@ -43,27 +60,43 @@
 
 @layer components {
   .field {
-    @apply w-full rounded-md border border-line bg-surface px-3 py-2 text-[15px] text-ink placeholder:text-ink-soft/60 focus:border-accent focus:outline-none;
+    @apply w-full rounded-lg border border-line-strong bg-surface px-3 py-2 text-[15px] text-ink placeholder:text-muted/70 focus:border-accent focus:outline-none;
   }
   .label {
-    @apply mb-1 block text-sm font-medium text-ink-soft;
+    @apply mb-1 block text-sm font-medium text-muted;
+  }
+  .eyebrow {
+    @apply text-[13px] font-semibold tracking-wider text-accent uppercase;
   }
   .btn-primary,
-  .btn-quiet {
-    @apply inline-flex items-center justify-center gap-2 rounded-md px-4 py-2 text-[15px] font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50;
+  .btn-quiet,
+  .btn-dark {
+    @apply inline-flex items-center justify-center gap-2 rounded-full px-5 py-2.5 text-[15px] font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50;
   }
   .btn-primary {
     @apply bg-accent text-white hover:bg-accent-ink;
   }
+  .btn-dark {
+    @apply bg-dark text-white hover:bg-ink-soft;
+  }
   .btn-quiet {
-    @apply border border-line bg-surface text-ink hover:border-ink-soft;
+    @apply border border-line bg-surface text-ink hover:border-line-strong;
+  }
+  .link {
+    @apply font-medium text-accent hover:text-accent-ink;
   }
   .panel {
-    @apply rounded-lg border border-line bg-surface;
+    @apply rounded-2xl bg-surface shadow-(--shadow-card);
+  }
+  .panel-raised {
+    @apply rounded-2xl bg-surface shadow-(--shadow-raised);
+  }
+  .chip {
+    @apply inline-flex items-center rounded-full px-2.5 py-0.5 text-[13px] font-medium;
   }
   /* The highlighter: the exact posting words that triggered a verdict. */
   .evidence {
-    @apply mt-1 max-w-[70ch] font-serif text-[14px] leading-relaxed text-ink-soft;
+    @apply mt-1 max-w-[70ch] text-[14px] leading-relaxed text-ink-soft;
   }
   .evidence mark {
     @apply rounded-sm bg-mark px-0.5 text-ink;
