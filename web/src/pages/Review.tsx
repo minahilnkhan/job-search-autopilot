@@ -247,16 +247,39 @@ function Detail({ id, onChanged, onOpen }: { id: number; onChanged: () => void; 
     );
   }
 
+  // Your unsaved edits, as one PATCH. Saving re-runs the Truth Check and
+  // re-renders the PDF, so it's also what makes the PDF match your edits.
+  const editPayload = () => ({
+    recruiterNote: note,
+    answers: app!.answers.flatMap((a, i) => (a.source !== "fixed" && a.answer !== answers[i] ? [{ index: i, answer: answers[i]! }] : [])),
+    lines: Object.entries(lineEdits)
+      .filter(([lid, t]) => lines.find((l) => l.id === lid)?.text !== t)
+      .map(([lid, text]) => ({ id: lid, text })),
+  });
+
   async function save() {
-    await act("save", () =>
-      api.editApplication(app!.id, {
-        recruiterNote: note,
-        answers: app!.answers.flatMap((a, i) => (a.source !== "fixed" && a.answer !== answers[i] ? [{ index: i, answer: answers[i]! }] : [])),
-        lines: Object.entries(lineEdits)
-          .filter(([lid, t]) => lines.find((l) => l.id === lid)?.text !== t)
-          .map(([lid, text]) => ({ id: lid, text })),
-      })
-    );
+    await act("save", () => api.editApplication(app!.id, editPayload()));
+  }
+
+  // With unsaved edits, Preview saves first, so it never shows the old PDF.
+  // The tab opens right away (inside the click) so the browser doesn't block it.
+  async function previewWithEdits(e: React.MouseEvent) {
+    if (!dirty) return;
+    e.preventDefault();
+    const tab = window.open("", "_blank");
+    setBusy("save");
+    setError(null);
+    try {
+      const saved = await api.editApplication(app!.id, editPayload());
+      load(saved);
+      onChanged();
+      if (tab) tab.location.href = `/api/applications/${saved.id}/resume.pdf?v=${saved.truth.checkedAt}`;
+    } catch (err) {
+      tab?.close();
+      setError((err as Error).message);
+    } finally {
+      setBusy(null);
+    }
   }
 
   const tierLabel = app.tier ? `Tier ${app.tier}${app.fitScore !== null ? ` · ${app.fitScore}/10` : ""}` : "";
@@ -318,7 +341,7 @@ function Detail({ id, onChanged, onOpen }: { id: number; onChanged: () => void; 
         <section className="panel-raised space-y-5 p-7">
           <div className="flex flex-wrap items-baseline justify-between gap-3">
             <h2 className="text-xl font-semibold">What changed in your resume</h2>
-            {app.hasPdf && <a className="link text-sm" href={pdfUrl} target="_blank" rel="noreferrer">Preview PDF</a>}
+            {app.hasPdf && <a className="link text-sm" href={pdfUrl} target="_blank" rel="noreferrer" onClick={previewWithEdits}>{dirty ? "Save and preview PDF" : "Preview PDF"}</a>}
           </div>
           {app.changes.length > 0 ? (
             <ul className="divide-y divide-line">
@@ -405,7 +428,7 @@ function Detail({ id, onChanged, onOpen }: { id: number; onChanged: () => void; 
 
           <div className="flex flex-wrap gap-x-5 gap-y-2 border-t border-line pt-4 text-sm">
             {app.hasDocx && <a className="link" href={`/api/applications/${app.id}/resume.docx`}>Download DOCX</a>}
-            {editable && <button className="link" disabled={!!busy} onClick={() => act("regen", () => api.regenerate(app.id))}>{busy === "regen" ? "Making files…" : "Remake PDF"}</button>}
+            {editable && <button className="link" disabled={!!busy} onClick={() => (dirty ? save() : act("regen", () => api.regenerate(app.id)))}>{busy === "regen" || busy === "save" ? "Making files…" : dirty ? "Save and remake PDF" : "Remake PDF"}</button>}
             {editable && (
               <button className="link" disabled={!!busy} title="Start again from your current base resume (after fixing it on the Resumes page)"
                 onClick={async () => {
