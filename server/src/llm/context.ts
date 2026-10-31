@@ -121,11 +121,20 @@ export function withConfirmedAdditions(inventory: string, dir = config.privateDi
  * call's own instructions follow as a second block.
  */
 export function sharedSystem(ctx: MentorContext, instructions: string) {
-  const text = fillMentorPrompt(mentorPromptFor(ctx.mentorPrompt, "resume"), {
+  return mentorSystem(ctx, instructions, "resume", { current_resume: "(The resume and posting for this job are in the message.)" });
+}
+
+/**
+ * The same, for a call that needs a different module: the daily check-in and
+ * weekly review read her tracker state, so that slot is filled instead.
+ */
+export function mentorSystem(ctx: MentorContext, instructions: string, module: PromptModule, slots: Record<string, string | null> = {}) {
+  const text = fillMentorPrompt(mentorPromptFor(ctx.mentorPrompt, module), {
     candidate_inventory: ctx.inventory,
-    current_resume: "(The resume and posting for this job are in the message.)",
+    current_resume: null,
     tracker_state: null,
     networking_summary: null,
+    ...slots,
   });
   return [
     { type: "text" as const, text, cache_control: { type: "ephemeral" as const } },

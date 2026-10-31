@@ -196,6 +196,7 @@ export const tasks = sqliteTable("tasks", {
     .notNull()
     .default("todo"),
   linkedEntity: text("linked_entity"), // e.g. "application:12"
+  estimateMinutes: integer("estimate_minutes"), // for the weekly hour cap
   createdAt: createdAt(),
 });
 
@@ -220,6 +221,8 @@ export const projects = sqliteTable("projects", {
   hoursLogged: real("hours_logged").notNull().default(0),
   tasks: text("tasks", { mode: "json" }).$type<unknown[]>(),
   resultMetric: text("result_metric"),
+  weekStart: text("week_start"), // Monday of the week it belongs to
+  skills: text("skills", { mode: "json" }).$type<string[]>(),
   createdAt: createdAt(),
 });
 

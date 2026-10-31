@@ -379,3 +379,89 @@ export type TrackedApplication = ApplicationSummary & {
   lastActivityAt: number | null;
   jobUrl: string | null;
 };
+
+
+// ---- Phase 5: tracking ---------------------------------------------------------
+
+export type Bucket = "applications" | "projects" | "prep";
+
+export type RunningTimer = {
+  id: number;
+  bucket: Bucket;
+  note: string | null;
+  startedAt: number;
+  elapsedMinutes: number;
+  /** Over two hours: the app stops trusting the clock and asks what you actually worked. */
+  needsConfirm: boolean;
+};
+
+export type TimeEntry = { id: number; bucket: Bucket; date: string; minutes: number; note: string | null };
+
+export type WeekHours = {
+  weekStart: string;
+  buckets: { bucket: Bucket; hours: number; target: number }[];
+  total: number;
+  cap: number;
+  /** Hours counted against the cap: project hours past their bucket are overflow, not a breach. */
+  coreHours: number;
+  projectOverflow: number;
+};
+
+export type Task = {
+  id: number;
+  title: string;
+  bucket: Bucket | null;
+  dueDate: string | null;
+  priority: number; // 1 = highest
+  source: "mentor" | "manual";
+  status: "todo" | "doing" | "done" | "dropped";
+  linkedEntity: string | null;
+  estimateMinutes: number | null;
+  overdue: boolean;
+};
+
+export type TaskPatch = Partial<Pick<Task, "title" | "status" | "bucket" | "dueDate" | "priority" | "estimateMinutes">>;
+
+export type CapWarning = { cap: number; plannedHours: number; afterHours: number; message: string };
+
+export type ResponseRate = { applications: number; responses: number; rate: number | null };
+
+/** Everything the mentor is allowed to assert about her week, counted from the database. */
+export type TrackerState = {
+  date: string;
+  weekStart: string;
+  targets: { appsPerDay: number; appsPerWeek: number; cap: number; bucketHours: { applications: number; projects: number; prep: number } };
+  capReviewDate: string;
+  daysToCapReview: number;
+  today: { submitted: { total: number; tierA: number; tierB: number }; hours: number };
+  week: { submitted: { total: number; tierA: number; tierB: number }; hours: WeekHours };
+  lastWeek: { submitted: { total: number; tierA: number; tierB: number }; hours: { applications: number; projects: number; prep: number } };
+  streak: number;
+  queue: { review: number; blocked: number; approved: number; snoozed: number };
+  pipeline: { submitted: number; screen: number; interview: number; offer: number; rejected: number; ghosted: number };
+  responseRate: { overall: ResponseRate; tierA: ResponseRate; tierB: ResponseRate; byRoleType: (ResponseRate & { type: string })[] };
+  followUpsDue: string[];
+  interviews: { id: number; companyName: string; jobTitle: string; stage: string; scheduledAt: string | null }[];
+  tasks: { title: string; bucket: Bucket | null; dueDate: string | null; status: string; overdue: boolean }[];
+  project: { title: string; status: string; hoursLogged: number; skills: string[]; repoUrl: string | null } | null;
+  skillsToBuild: { skill: string; postings: number }[];
+  spendThisMonth: number;
+};
+
+/** A saved check-in: the state it was given, and what the mentor wrote from it. */
+export type CheckInRecord = { id: number; date: string; type: "daily" | "weekly"; state: TrackerState; output: unknown; createdAt: number };
+
+export type DailyCheckInOutput = {
+  priorities: { title: string; bucket: Bucket; estimateMinutes: number; why: string }[];
+  verdict: { kind: "win" | "call_out" | "none"; text: string };
+  adjustments: string[];
+};
+
+export type WeeklyReviewOutput = {
+  diagnosis: string;
+  targets: { applications: number; projectHours: number; prepHours: number; note: string };
+  projectIdeas: { title: string; oneLine: string; skills: string[]; wildcard: boolean }[];
+  prepFocus: string;
+  githubTask: string;
+  tasks: { title: string; bucket: Bucket; estimateMinutes: number }[];
+};

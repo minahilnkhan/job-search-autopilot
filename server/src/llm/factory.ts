@@ -5,6 +5,7 @@ import { makeAnthropicScorer } from "./scoreJob";
 import { makeAnthropicTailor, type Tailor } from "./tailor";
 import { makeAnthropicAnswerWriter, type AnswerWriter } from "./answers";
 import { makeAnthropicChat, makeAnthropicFollowUp, type ChatWriter, type FollowUpWriter } from "./chat";
+import { makeAnthropicCheckIn, type CheckInWriter } from "./checkIn";
 import type { Settings } from "../../../shared/types";
 
 /** Real scorer, or a plain-words reason it can't run yet. */
@@ -61,6 +62,17 @@ export function anthropicFollowUpFactory(settings: Settings): { writer: FollowUp
   if (!config.anthropicApiKey) return { unavailable: "no ANTHROPIC_API_KEY in .env" };
   try {
     return { writer: makeAnthropicFollowUp({ apiKey: config.anthropicApiKey, model: settings.models.tailoring, context: loadMentorContext() }) };
+  } catch (err) {
+    if (err instanceof MissingContextError) return { unavailable: err.message };
+    throw err;
+  }
+}
+
+/** The daily check-in and weekly review (the check-in model from Settings), or why they can't run. */
+export function anthropicCheckInFactory(settings: Settings): { writer: CheckInWriter } | { unavailable: string } {
+  if (!config.anthropicApiKey) return { unavailable: "no ANTHROPIC_API_KEY in .env" };
+  try {
+    return { writer: makeAnthropicCheckIn({ apiKey: config.anthropicApiKey, model: settings.models.checkIns, context: loadMentorContext() }) };
   } catch (err) {
     if (err instanceof MissingContextError) return { unavailable: err.message };
     throw err;

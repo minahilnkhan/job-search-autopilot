@@ -4,6 +4,7 @@ import type { DB } from "./db/client";
 import { pipelineRuns } from "./db/schema";
 import { getSettings, localDate, localTime } from "./services/settings";
 import { runPipeline, type PipelineDeps } from "./services/pipeline";
+import { needsDailyCheckIn, needsWeeklyReview, runDailyCheckIn, runWeeklyReview, type CheckInDeps } from "./services/checkIns";
 
 /**
  * Catch-up rule, pure so it's testable: if today's scheduled time has passed
@@ -20,12 +21,34 @@ export function shouldCatchUp(args: {
   return args.enabled && args.timeNow >= args.dailyTime && args.lastCompletedRunDate !== args.today;
 }
 
-export function startScheduler(db: DB, deps: PipelineDeps, log: (msg: string) => void) {
+export function startScheduler(db: DB, deps: PipelineDeps, checkIn: CheckInDeps, log: (msg: string) => void) {
   let task: ScheduledTask | null = null;
+
+  // The check-in reads the shortlist the run just produced, so it follows the
+  // pipeline rather than running on its own schedule. A failure here never
+  // fails the run: the jobs still arrive, the check-in is a button away.
+  const checkInAfterRun = async () => {
+    if (!checkIn.getCheckIn) return;
+    try {
+      if (needsDailyCheckIn(db)) {
+        await runDailyCheckIn(db, checkIn);
+        log("Daily check-in written.");
+      }
+      if (needsWeeklyReview(db)) {
+        await runWeeklyReview(db, checkIn);
+        log("Weekly review written.");
+      }
+    } catch (err) {
+      log(`Check-in skipped: ${(err as Error).message}`);
+    }
+  };
 
   const run = (trigger: "schedule" | "catch_up") =>
     runPipeline(db, deps, trigger)
-      .then((r) => log(`Pipeline ${trigger} run ${r.id}: ${r.status}${r.message ? ` (${r.message})` : ""}`))
+      .then(async (r) => {
+        log(`Pipeline ${trigger} run ${r.id}: ${r.status}${r.message ? ` (${r.message})` : ""}`);
+        await checkInAfterRun();
+      })
       .catch((err) => log(`Pipeline ${trigger} run skipped: ${(err as Error).message}`));
 
   const schedule = () => {

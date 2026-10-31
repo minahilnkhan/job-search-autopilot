@@ -8,6 +8,8 @@ import { pipelineRoutes } from "./routes/pipeline";
 import { applicationRoutes } from "./routes/applications";
 import { submissionRoutes } from "./routes/submissions";
 import { extensionRoutes } from "./routes/extension";
+import { checkInRoutes, trackingRoutes } from "./routes/tracking";
+import type { CheckInDeps } from "./services/checkIns";
 import type { SubmitDeps } from "./services/submissions";
 import type { PrepDeps } from "./services/applications";
 import { TransitionError } from "./domain/applicationStatus";
@@ -21,7 +23,7 @@ import type { PipelineDeps } from "./services/pipeline";
  */
 export function buildApp(
   db: DB,
-  opts: { logger?: boolean; pipeline: PipelineDeps; prep: PrepDeps; submit?: SubmitDeps; onSettingsChanged?: () => void }
+  opts: { logger?: boolean; pipeline: PipelineDeps; prep: PrepDeps; submit?: SubmitDeps; checkIn?: CheckInDeps; onSettingsChanged?: () => void }
 ) {
   const app = Fastify({ logger: opts.logger ?? false, bodyLimit: 1024 * 1024 });
 
@@ -55,5 +57,7 @@ export function buildApp(
   applicationRoutes(app, db, opts.prep);
   submissionRoutes(app, db, opts.submit);
   extensionRoutes(app, db, opts.submit, opts.prep);
+  trackingRoutes(app, db);
+  checkInRoutes(app, db, opts.checkIn ?? {});
   return app;
 }
