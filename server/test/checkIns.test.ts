@@ -59,13 +59,24 @@ const req = async (method: "GET" | "POST" | "PUT", url: string, payload?: unknow
   return { status: res.statusCode, body: res.body ? res.json() : null };
 };
 
+let chatSeen: { trackerState: string; message: string }[];
+
 function setup(writer: CheckInWriter | { unavailable: string } = fakeWriter()) {
   db = makeTestDb();
   seen = [];
+  chatSeen = [];
   app = buildApp(db, {
     pipeline: OFFLINE_PIPELINE,
     prep: prepDeps(),
-    checkIn: { getCheckIn: () => ("unavailable" in writer ? writer : { writer }) },
+    checkIn: {
+      getCheckIn: () => ("unavailable" in writer ? writer : { writer }),
+      getMentorChat: () => ({
+        chat: async (i) => {
+          chatSeen.push({ trackerState: i.trackerState, message: i.message });
+          return { reply: "Lead with the Morphemic Dictionary.", usage: { inputTokens: 1000, outputTokens: 50, cacheReadTokens: 0, cacheWriteTokens: 0 }, model: "claude-sonnet-5-5" };
+        },
+      }),
+    },
   });
 }
 
@@ -153,5 +164,16 @@ describe("weekly review", () => {
     await req("POST", "/api/check-ins/weekly");
     expect(seen[0]).toHaveProperty("skillsToBuild");
     expect(seen[0]!.trackerState).toContain("Week (from");
+  });
+});
+
+describe("mentor chat", () => {
+  it("answers with this week's numbers in hand, and saves nothing", async () => {
+    await submittedApp();
+    const r = await req("POST", "/api/mentor/chat", { message: "What should I lead with for an FDE role?", history: [] });
+    expect(r.body.reply).toContain("Morphemic");
+    expect(chatSeen[0]!.trackerState).toContain("1/10 applications");
+    expect((await req("GET", "/api/tasks")).body.tasks).toEqual([]); // a conversation, not an action
+    expect(db.select().from(apiUsage).all().map((u) => u.purpose)).toContain("mentor_chat");
   });
 });

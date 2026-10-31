@@ -8,7 +8,7 @@ import { pipelineRoutes } from "./routes/pipeline";
 import { applicationRoutes } from "./routes/applications";
 import { submissionRoutes } from "./routes/submissions";
 import { extensionRoutes } from "./routes/extension";
-import { checkInRoutes, trackingRoutes } from "./routes/tracking";
+import { checkInRoutes, projectRoutes, trackingRoutes } from "./routes/tracking";
 import type { CheckInDeps } from "./services/checkIns";
 import type { SubmitDeps } from "./services/submissions";
 import type { PrepDeps } from "./services/applications";
@@ -58,6 +58,7 @@ export function buildApp(
   submissionRoutes(app, db, opts.submit);
   extensionRoutes(app, db, opts.submit, opts.prep);
   trackingRoutes(app, db);
+  projectRoutes(app, db);
   checkInRoutes(app, db, opts.checkIn ?? {});
   return app;
 }

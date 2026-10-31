@@ -237,3 +237,30 @@ Her fixed work-authorization answers are about the US. On a job abroad, a questi
 - **Smaller prompts.** Per-job calls drop the time budget, tone and quality-check sections, and unused slots (`tracker_state`, `networking_summary`, `current_resume` on scoring) are removed instead of sent as "(Not used)".
 - **Fewer drafting calls on forms.** The answer writer drafts required fields and optional essay boxes only. Other optional fields are left for her.
 - **Not changed, on purpose.** Effort levels and models stay as they are until there's usage data on what each call costs; the by-purpose spend query is in the reply that introduced this.
+
+
+## Phase 5: dashboard and mentor
+
+### The app owns every number; the model owns the judgment
+The prompt's hard rule is "base ALL counts on <tracker_state>". The only way to enforce that is to never give the model the job: `services/tracker.ts` counts applications, hours, response rates and streaks from the database, renders them as sentences with their units and targets, and the check-in schema has no field for a count. The model returns priorities, a verdict, a diagnosis and project ideas. So a hallucinated number can't reach the screen — there's nowhere for it to go.
+
+### Hours are derived, never stored twice
+`weekHours` adds up time logs; a project's hours are the project-bucket time logged in its week, not a column on the project. One number, one source, so the dashboard and the check-in can't disagree. The mentor prompt's overflow rule lives here too: project hours past their 6 are reported as approved overflow and left out of the figure compared against the 30-hour cap.
+
+### A timer over two hours is a question, not data
+The spec asks for auto-stop after two hours of inactivity. A background job that silently closes timers would log hours she didn't work, so instead the timer stops counting, the app asks what she actually worked, and a new timer can't start until she answers. Discarding it logs nothing.
+
+### Tasks carry estimates so the cap can be enforced before the fact
+The warning compares logged hours plus open estimates for the week against the cap, and it's advisory: "Add it anyway" is one click. The mentor can't be the only thing holding the line, because tasks are added faster than check-ins run.
+
+### Today stays the day; Progress holds the week
+The spec's dashboard is one screen, but Today was deliberately kept to four steps. So Today gained the check-in (verdict, three priorities, the timer) and the week's numbers, charts, funnel, response rates, project and mentor chat went to a new Progress tab.
+
+### No charting library
+Recharts is in the spec's default stack. Two charts — a bar per bucket and a four-row funnel — are a handful of divs, and the app already has the tokens for them. Not worth a dependency and a second styling system; revisit if a chart needs axes or tooltips.
+
+### Mentor chat changes nothing
+The free-form chat gets the whole prompt (she could ask about anything) and the tracker state, but writes nothing: no tasks, no resume edits. Edits stay in the application chat, where the Truth Check runs on every proposed line.
+
+### A project isn't shipped without a repo and a measured result
+The portfolio module says a project goes on the resume once it's built, on GitHub, and has one honest measured result. "Mark it shipped" enforces exactly that, since the whole point is that it becomes a resume line.

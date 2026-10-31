@@ -4,6 +4,8 @@ import { api, usd } from "../lib/api";
 import { ScoreBadge, ScoreBreakdownView } from "../components/Score";
 import type { DaySummary } from "../lib/api";
 import { PreparingTray, type Preparing } from "../components/PreparingTray";
+import { TaskList, Timer } from "../components/Tracking";
+import type { CheckInRecord, DailyCheckInOutput, RunningTimer, Task } from "../../../shared/types";
 
 const EVERIFY_TEXT = { confirmed: "E-Verify confirmed", likely: "E-Verify likely", unknown: "E-Verify not checked" } as const;
 const SPONSOR_TEXT = { yes: "Sponsors visas", no: "No sponsorship", unstated: "Sponsorship not stated" } as const;
@@ -161,6 +163,62 @@ function SkillsToBuild() {
   );
 }
 
+/**
+ * The mentor's morning check-in: today's three priorities as a list you can
+ * tick off, plus one win or call-out. The numbers in it are the app's, not the
+ * model's, so nothing here can be a hallucinated count.
+ */
+function CheckInCard({
+  checkIn,
+  tasks,
+  timer,
+  busy,
+  onRun,
+  onChanged,
+}: {
+  checkIn: CheckInRecord | null;
+  tasks: Task[];
+  timer: RunningTimer | null;
+  busy: boolean;
+  onRun: () => void;
+  onChanged: () => void;
+}) {
+  const today = new Date().toLocaleDateString("en-CA");
+  const out = checkIn?.date === today ? (checkIn.output as DailyCheckInOutput) : null;
+  const todays = tasks.filter((t) => !t.dueDate || t.dueDate <= today);
+  return (
+    <section className="panel space-y-4 p-6">
+      <div className="flex flex-wrap items-baseline justify-between gap-3">
+        <h2 className="text-lg font-semibold">{out ? "Today's priorities" : "Your check-in"}</h2>
+        <div className="flex flex-wrap items-center gap-3">
+          <Timer running={timer} onChanged={onChanged} />
+          <button className="link text-sm" disabled={busy} onClick={onRun}>
+            {busy ? "Writing…" : out ? "Run it again" : "Run the check-in"}
+          </button>
+        </div>
+      </div>
+
+      {out?.verdict && out.verdict.kind !== "none" && (
+        <p className={`rounded-xl px-4 py-3 text-[15px] ${out.verdict.kind === "win" ? "bg-pass-bg text-pass" : "bg-warn-bg text-warn"}`}>{out.verdict.text}</p>
+      )}
+
+      {out || todays.length > 0 ? (
+        <TaskList tasks={todays} onChanged={onChanged} />
+      ) : (
+        <p className="text-sm text-muted">No check-in yet today. It runs with the morning job search, or press the button for one now.</p>
+      )}
+
+      {out?.adjustments?.length ? (
+        <ul className="space-y-1 border-t border-line pt-3 text-[13px] text-muted">
+          {out.adjustments.map((a, i) => (
+            <li key={i}>{a}</li>
+          ))}
+        </ul>
+      ) : null}
+    </section>
+  );
+}
+
 export function Today({ onJobsChanged }: { onJobsChanged: () => void }) {
   const [list, setList] = useState<Shortlist | null | undefined>(undefined);
   const [summary, setSummary] = useState<DaySummary | null>(null);
@@ -171,8 +229,20 @@ export function Today({ onJobsChanged }: { onJobsChanged: () => void }) {
   const [last, setLast] = useState<LastAction | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [checkIn, setCheckIn] = useState<CheckInRecord | null>(null);
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [timer, setTimer] = useState<RunningTimer | null>(null);
+  const [checkInBusy, setCheckInBusy] = useState(false);
+
+  const loadDay = useCallback(async () => {
+    const [ci, tk, time] = await Promise.all([api.checkIns(), api.tasks(), api.time()]);
+    setCheckIn(ci.daily);
+    setTasks(tk.tasks);
+    setTimer(time.running);
+  }, []);
 
   const load = useCallback(async () => {
+    void loadDay().catch(() => {});
     const [sl, runs, prep, sum] = await Promise.all([api.getShortlist(), api.listRuns(), api.preparing(), api.summary()]);
     setList(sl);
     setRunning(runs.running);
@@ -181,7 +251,7 @@ export function Today({ onJobsChanged }: { onJobsChanged: () => void }) {
     setPreparing(prep);
     setSummary(sum);
     return runs.running;
-  }, []);
+  }, [loadDay]);
   const refreshSide = useCallback(async () => {
     const [prep, sum] = await Promise.all([api.preparing(), api.summary()]);
     setPreparing(prep);
@@ -301,6 +371,26 @@ export function Today({ onJobsChanged }: { onJobsChanged: () => void }) {
       </section>
 
       {error && <p className="rounded-xl bg-fail-bg px-4 py-3 text-fail" role="alert">{error}</p>}
+
+      <CheckInCard
+        checkIn={checkIn}
+        tasks={tasks}
+        timer={timer}
+        busy={checkInBusy}
+        onRun={async () => {
+          setCheckInBusy(true);
+          setError(null);
+          try {
+            await api.runCheckIn("daily");
+            await loadDay();
+          } catch (e) {
+            setError((e as Error).message);
+          } finally {
+            setCheckInBusy(false);
+          }
+        }}
+        onChanged={() => void loadDay()}
+      />
 
       <section className="flex flex-wrap items-start gap-6">
         <ol className="flex min-w-0 flex-[999_1_640px] flex-col gap-3">

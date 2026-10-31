@@ -221,6 +221,7 @@ export const projects = sqliteTable("projects", {
   hoursLogged: real("hours_logged").notNull().default(0),
   tasks: text("tasks", { mode: "json" }).$type<unknown[]>(),
   resultMetric: text("result_metric"),
+  summary: text("summary"), // the one-line idea it came from
   weekStart: text("week_start"), // Monday of the week it belongs to
   skills: text("skills", { mode: "json" }).$type<string[]>(),
   createdAt: createdAt(),

@@ -3,6 +3,7 @@ import type { JobListItem } from "../../shared/types";
 import { api, usd } from "./lib/api";
 import { AddJob } from "./pages/AddJob";
 import { Today } from "./pages/Today";
+import { Progress } from "./pages/Progress";
 import { Jobs } from "./pages/Jobs";
 import { Companies } from "./pages/Companies";
 import { Settings } from "./pages/Settings";
@@ -14,16 +15,18 @@ import { Applications } from "./pages/Applications";
 // Four places in the nav; everything else hangs off one of them.
 const NAV = [
   { path: "#/today", label: "Today" },
+  { path: "#/progress", label: "Progress" },
   { path: "#/applications", label: "Applications" },
   { path: "#/jobs", label: "Jobs" },
   { path: "#/settings", label: "Settings" },
 ] as const;
-const PAGES = ["#/today", "#/applications", "#/review", "#/jobs", "#/add", "#/settings", "#/settings/resumes", "#/settings/companies"] as const;
+const PAGES = ["#/today", "#/progress", "#/applications", "#/review", "#/jobs", "#/add", "#/settings", "#/settings/resumes", "#/settings/companies"] as const;
 type Page = (typeof PAGES)[number];
 // Old addresses still work.
 const MOVED: Record<string, string> = { "#/tracker": "#/applications?stage=submitted", "#/resumes": "#/settings/resumes", "#/companies": "#/settings/companies" };
 const SECTION: Record<Page, string> = {
   "#/today": "#/today",
+  "#/progress": "#/progress",
   "#/applications": "#/applications",
   "#/review": "#/applications",
   "#/jobs": "#/jobs",
@@ -124,6 +127,7 @@ export default function App() {
           </nav>
         )}
         {route === "#/today" && <Today onJobsChanged={loadJobs} />}
+        {route === "#/progress" && <Progress />}
         {route === "#/applications" && <Applications key={location.hash} onCountsChanged={loadCounts} />}
         {route === "#/review" && <Review key={location.hash.replace(/&?stage=[a-z]+/, "")} onCountsChanged={loadCounts} />}
         {route === "#/jobs" && <Jobs jobs={jobs} setJobs={setJobs} />}

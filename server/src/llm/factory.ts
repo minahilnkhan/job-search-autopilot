@@ -6,6 +6,7 @@ import { makeAnthropicTailor, type Tailor } from "./tailor";
 import { makeAnthropicAnswerWriter, type AnswerWriter } from "./answers";
 import { makeAnthropicChat, makeAnthropicFollowUp, type ChatWriter, type FollowUpWriter } from "./chat";
 import { makeAnthropicCheckIn, type CheckInWriter } from "./checkIn";
+import { makeAnthropicMentorChat, type MentorChat } from "./mentorChat";
 import type { Settings } from "../../../shared/types";
 
 /** Real scorer, or a plain-words reason it can't run yet. */
@@ -73,6 +74,17 @@ export function anthropicCheckInFactory(settings: Settings): { writer: CheckInWr
   if (!config.anthropicApiKey) return { unavailable: "no ANTHROPIC_API_KEY in .env" };
   try {
     return { writer: makeAnthropicCheckIn({ apiKey: config.anthropicApiKey, model: settings.models.checkIns, context: loadMentorContext() }) };
+  } catch (err) {
+    if (err instanceof MissingContextError) return { unavailable: err.message };
+    throw err;
+  }
+}
+
+/** Free-form mentor chat (the check-in model), or why it can't run. */
+export function anthropicMentorChatFactory(settings: Settings): { chat: MentorChat } | { unavailable: string } {
+  if (!config.anthropicApiKey) return { unavailable: "no ANTHROPIC_API_KEY in .env" };
+  try {
+    return { chat: makeAnthropicMentorChat({ apiKey: config.anthropicApiKey, model: settings.models.checkIns, context: loadMentorContext() }) };
   } catch (err) {
     if (err instanceof MissingContextError) return { unavailable: err.message };
     throw err;

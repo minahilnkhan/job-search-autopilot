@@ -10,13 +10,17 @@ import { ConflictError } from "./jobs";
 import { ScoreError } from "../llm/scoreJob";
 import { accountProblem } from "../llm/errors";
 import type { CheckInWriter, DailyCheckIn, WeeklyReview } from "../llm/checkIn";
+import type { MentorChat, MentorTurn } from "../llm/mentorChat";
 import type { CheckInRecord, Settings, TrackerState } from "../../../shared/types";
 import { weekStart } from "../domain/week";
 
 // The mentor's two scheduled jobs. Each one: read the state, ask for the
 // judgment parts, save the result, and turn its priorities into tasks.
 
-export type CheckInDeps = { getCheckIn?: (s: Settings) => { writer: CheckInWriter } | { unavailable: string } };
+export type CheckInDeps = {
+  getCheckIn?: (s: Settings) => { writer: CheckInWriter } | { unavailable: string };
+  getMentorChat?: (s: Settings) => { chat: MentorChat } | { unavailable: string };
+};
 
 /** The day's shortlist as a short table, so the mentor can see what it's planning around. */
 function todayPicksText(db: DB, date: string): string {
@@ -105,4 +109,20 @@ export function needsWeeklyReview(db: DB, now = new Date()): boolean {
   if (new Date(`${today}T12:00:00Z`).getUTCDay() !== 0) return false;
   const last = latestCheckIn(db, "weekly");
   return !last || weekStart(last.date) !== weekStart(today);
+}
+
+/** One turn of free-form mentor chat. Nothing is saved: the panel holds the thread. */
+export async function mentorChat(db: DB, deps: CheckInDeps, input: { message: string; history: MentorTurn[] }, now = new Date()) {
+  const settings = getSettings(db);
+  const c = deps.getMentorChat?.(settings);
+  if (!c) throw new ConflictError("Mentor chat isn't set up.");
+  if ("unavailable" in c) throw new ConflictError(`Mentor chat can't run: ${c.unavailable}`);
+  try {
+    const r = await c.chat({ trackerState: trackerStateText(trackerState(db, now)), history: input.history, message: input.message });
+    recordUsage(db, { purpose: "mentor_chat", model: r.model, usage: r.usage, now });
+    return { reply: r.reply };
+  } catch (err) {
+    if (err instanceof ScoreError && err.usage) recordUsage(db, { purpose: "mentor_chat", model: settings.models.checkIns, usage: err.usage, now });
+    throw new ConflictError(accountProblem(err) ?? (err as Error).message);
+  }
 }

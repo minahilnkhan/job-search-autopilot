@@ -11,9 +11,9 @@ I'm a software engineer on STEM OPT, which narrows down which jobs I can take: t
 | 1. Foundations | Schema, settings, company list, paste a job → deterministic hard filters | ✅ Done |
 | 2. Scoring + shortlist | Greenhouse/Lever/Ashby fetchers, AI fit scoring, tiers, daily ranked shortlist, schedule | ✅ Done |
 | 3. Prep + Truth Check | Tailored resumes, a code-level check that blocks any unverified claim, review queue | ✅ Done |
-| 4. Assisted submit | Playwright prefills the form; I review and click submit myself | Next |
-| 5. Dashboard + mentor | Progress vs targets, daily check-ins, time and API-cost tracking | |
-| 6. Polish | Demo, measured results | |
+| 4. Assisted submit | Playwright prefills the form; I review and click submit myself | ✅ Done |
+| 5. Dashboard + mentor | Progress vs targets, daily check-ins, tasks, hours, weekly project | ✅ Done |
+| 6. Polish | Demo, measured results | Next |
 
 ## What Phase 1 does
 
@@ -98,12 +98,30 @@ Fields are found by their visible labels (plus id/name hints), so the same rules
 
 The **Tracker** page lists submitted applications. Move each through screen → interview → offer, or rejected / ghosted / withdrawn. Tier A applications get a follow-up date 7 days after submitting.
 
+## What Phase 5 adds
+
+**The app now runs your week, not just your applications.**
+
+**Today** opens with your check-in: one win or call-out, the three priorities the mentor set, and a one-click timer for applications, project or interview prep. Tick the priorities off as you go; add your own.
+
+**Progress** holds the week: applications today and this week against target, the day streak, hours by bucket against the 20/6/4 split and the 30-hour cap, the pipeline funnel, response rate overall and by tier and role type, this week's project, the Sunday review, and **Ask your mentor** for strategy questions and mock interviews.
+
+**Every number on both screens is counted in code** from the database, in one place (`services/tracker.ts`), and the same text is what the mentor is given. The model is never asked for a count — its schema has no field for one — so the check-in can't invent a figure. It writes the judgment: today's priorities, the win or call-out, the weekly diagnosis, six project ideas and the GitHub task.
+
+**Hours.** One timer at a time; starting a second stops the first. A timer left running over two hours stops counting and asks how long you actually worked, rather than logging a night's sleep as applications. Manual entry for hours you didn't time. Project hours past their 6 count as approved overflow, not a breach of the cap.
+
+**The cap.** Adding a task whose estimate would take the week past 30 core hours warns you first, with what it would take you to. "Add it anyway" is one click — it's a check, not a lock.
+
+**The weekly project.** The Sunday review proposes six ideas (five built around the skills recent postings keep asking for, plus one wildcard); starting one creates this week's project. It can only be marked **shipped** with a GitHub URL and one measured result, because that's the bar for putting it on the resume.
+
+**Schedule.** The daily check-in runs after the morning job search, so it can see the day's shortlist. The weekly review runs on Sundays. Both are a button away if you'd rather run them yourself, and a failure never blocks the job search.
+
 ## Architecture
 
 ```mermaid
 flowchart LR
   subgraph Browser
-    UI["React + Vite + Tailwind<br/>Today · Review · Tracker · Jobs · Resumes · Companies · Settings"]
+    UI["React + Vite + Tailwind<br/>Today · Progress · Applications · Jobs · Settings"]
   end
   subgraph Server["Fastify server (localhost only)"]
     CRON["node-cron<br/>daily run + catch-up"]

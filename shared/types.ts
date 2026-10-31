@@ -465,3 +465,20 @@ export type WeeklyReviewOutput = {
   githubTask: string;
   tasks: { title: string; bucket: Bucket; estimateMinutes: number }[];
 };
+
+export type ProjectRecord = {
+  id: number;
+  title: string;
+  summary: string | null;
+  repoUrl: string | null;
+  status: "active" | "shipped" | "dropped";
+  weekStart: string | null;
+  skills: string[];
+  resultMetric: string | null;
+  /** Project-bucket hours logged in its week, derived so it can't disagree with the week. */
+  hoursLogged: number;
+  tasks: Task[];
+  createdAt: number;
+};
+
+export type ProjectPatch = Partial<Pick<ProjectRecord, "title" | "summary" | "repoUrl" | "status" | "resultMetric" | "skills">>;

@@ -1,10 +1,11 @@
-import { desc, eq, inArray, isNotNull } from "drizzle-orm";
+import { eq, inArray, isNotNull } from "drizzle-orm";
 import type { DB } from "../db/client";
-import { applications, companies, interviews, jobs, projects } from "../db/schema";
+import { applications, companies, interviews, jobs } from "../db/schema";
 import { getSettings, localDate } from "./settings";
 import { listApplications, skillsToBuild } from "./applications";
 import { listTime, weekHours } from "./time";
 import { listTasks } from "./tasks";
+import { currentProject } from "./projects";
 import { monthSpend } from "./usage";
 import { addDays, daysBetween, hours, streakDays, weekStart, type Bucket } from "../domain/week";
 import type { TrackerState } from "../../../shared/types";
@@ -85,7 +86,7 @@ export function trackerState(db: DB, now = new Date()): TrackerState {
       scheduledAt: r.i.scheduledAt ? localDate(r.i.scheduledAt, tz) : null,
     }));
 
-  const project = db.select().from(projects).where(eq(projects.weekStart, thisWeek)).orderBy(desc(projects.id)).get();
+  const project = currentProject(db, now);
   const dueFollowUps = submitted.filter((x) => x.status === "submitted" && x.followUpDue && x.followUpDue <= today);
 
   return {

@@ -13,8 +13,18 @@ import type {
   JobListItem,
   PipelineProgress,
   PipelineRun,
+  CapWarning,
+  CheckInRecord,
+  DailyCheckInOutput,
+  ProjectRecord,
+  RunningTimer,
   Settings,
   Shortlist,
+  Task,
+  TimeEntry,
+  TrackerState,
+  WeeklyReviewOutput,
+  WeekHours,
   SubmitSession,
   TrackedApplication,
 } from "../../../shared/types";
@@ -110,7 +120,37 @@ export const api = {
   summary: () => request<DaySummary>("GET", "/api/summary"),
   draftFollowUp: (id: number) => request<{ text: string; warning: string | null }>("POST", `/api/applications/${id}/follow-up/draft`, {}),
   monthSpend: () => request<{ month: string; calls: number; costUsd: number; unpricedCalls: number }>("GET", "/api/usage/month"),
+
+  // Phase 5: hours, to-dos, projects and the mentor's check-ins.
+  time: () => request<{ running: RunningTimer | null; week: WeekHours; entries: TimeEntry[] }>("GET", "/api/time"),
+  startTimer: (bucket: Bucket, note?: string) => request<RunningTimer>("POST", "/api/time/start", { bucket, note: note ?? null }),
+  stopTimer: (id: number, minutes?: number) => request<TimeEntry>("POST", `/api/time/${id}/stop`, minutes === undefined ? {} : { minutes }),
+  discardTimer: (id: number) => request<{ ok: true }>("POST", `/api/time/${id}/discard`, {}),
+  logTime: (body: { bucket: Bucket; minutes: number; date?: string; note?: string | null }) => request<TimeEntry>("POST", "/api/time", body),
+  deleteTime: (id: number) => request<{ ok: true }>("DELETE", `/api/time/${id}`),
+  tasks: (includeDone = false) => request<{ tasks: Task[]; hours: PlannedHours }>("GET", `/api/tasks?includeDone=${includeDone}`),
+  createTask: (body: { title: string; bucket?: Bucket | null; dueDate?: string | null; priority?: number; estimateMinutes?: number | null; acceptOverCap?: boolean }) =>
+    request<{ task: Task | null; warning: CapWarning | null }>("POST", "/api/tasks", body),
+  updateTask: (id: number, body: Partial<Pick<Task, "title" | "status" | "bucket" | "dueDate" | "priority" | "estimateMinutes">>) =>
+    request<Task>("PATCH", `/api/tasks/${id}`, body),
+  deleteTask: (id: number) => request<{ ok: true }>("DELETE", `/api/tasks/${id}`),
+  projects: () => request<{ current: ProjectRecord | null; all: ProjectRecord[] }>("GET", "/api/projects"),
+  startProject: (body: { title: string; summary?: string | null; skills?: string[]; repoUrl?: string | null }) => request<ProjectRecord>("POST", "/api/projects", body),
+  updateProject: (id: number, body: Partial<Pick<ProjectRecord, "title" | "summary" | "repoUrl" | "status" | "resultMetric" | "skills">>) =>
+    request<ProjectRecord>("PATCH", `/api/projects/${id}`, body),
+  trackerState: () => request<TrackerState>("GET", "/api/tracker-state"),
+  checkIns: () => request<{ daily: CheckInRecord | null; weekly: CheckInRecord | null }>("GET", "/api/check-ins"),
+  runCheckIn: (type: "daily" | "weekly") => request<CheckInRecord>("POST", `/api/check-ins/${type}`, {}),
+  mentorChat: (message: string, history: { role: "user" | "assistant"; text: string }[]) =>
+    request<{ reply: string }>("POST", "/api/mentor/chat", { message, history }),
 };
+
+export type Bucket = "applications" | "projects" | "prep";
+export type PlannedHours = { weekStart: string; loggedCore: number; plannedFromTasks: number; projectOverflow: number; cap: number; totalCore: number };
+export type DailyOutput = DailyCheckInOutput;
+export type WeeklyOutput = WeeklyReviewOutput;
+
+export const BUCKET_LABEL: Record<Bucket, string> = { applications: "Applications", projects: "Project", prep: "Interview prep" };
 
 export type DaySummary = {
   date: string;
