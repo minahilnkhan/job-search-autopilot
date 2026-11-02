@@ -5,6 +5,7 @@ import { pipelineRuns } from "./db/schema";
 import { getSettings, localDate, localTime } from "./services/settings";
 import { runPipeline, type PipelineDeps } from "./services/pipeline";
 import { needsDailyCheckIn, needsWeeklyReview, runDailyCheckIn, runWeeklyReview, type CheckInDeps } from "./services/checkIns";
+import { isMailCheckDue, MAIL_CHECK_AT, runMailCheck, type MailDeps } from "./services/mail";
 
 /**
  * Catch-up rule, pure so it's testable: if today's scheduled time has passed
@@ -21,8 +22,9 @@ export function shouldCatchUp(args: {
   return args.enabled && args.timeNow >= args.dailyTime && args.lastCompletedRunDate !== args.today;
 }
 
-export function startScheduler(db: DB, deps: PipelineDeps, checkIn: CheckInDeps, log: (msg: string) => void) {
+export function startScheduler(db: DB, deps: PipelineDeps, checkIn: CheckInDeps, log: (msg: string) => void, mail: MailDeps = {}) {
   let task: ScheduledTask | null = null;
+  let mailTask: ScheduledTask | null = null;
 
   // The check-in reads the shortlist the run just produced, so it follows the
   // pipeline rather than running on its own schedule. A failure here never
@@ -85,7 +87,38 @@ export function startScheduler(db: DB, deps: PipelineDeps, checkIn: CheckInDeps,
     }
   };
 
+  // The inbox: once a day at 8pm, on its own schedule (it doesn't depend on the morning run).
+  const checkMail = (trigger: "schedule" | "catch_up") =>
+    runMailCheck(db, mail, trigger)
+      .then((r) => log(`Inbox ${trigger} check: ${r.matched} job emails, ${r.suggestions} to confirm, ${r.recorded} recorded.`))
+      .catch((err) => log(`Inbox check skipped: ${(err as Error).message}`));
+
+  const scheduleMail = () => {
+    void mailTask?.stop();
+    mailTask = null;
+    const src = mail.getSource?.();
+    if (!src || "unavailable" in src) return log(`Inbox check off: ${src && "unavailable" in src ? src.unavailable : "not set up"}.`);
+    const [h, m] = MAIL_CHECK_AT.split(":").map(Number);
+    const tz = getSettings(db).pipeline.timezone;
+    mailTask = cron.schedule(`${m} ${h} * * *`, () => checkMail("schedule"), { timezone: tz, name: "daily-inbox", noOverlap: true });
+    log(`Inbox check scheduled for ${MAIL_CHECK_AT} ${tz}.`);
+    if (isMailCheckDue(db)) {
+      log("Missed the last 8pm inbox check; checking now.");
+      void checkMail("catch_up");
+    }
+  };
+
   schedule();
   catchUpIfMissed();
-  return { reschedule: schedule, stop: () => void task?.stop() };
+  scheduleMail();
+  return {
+    reschedule: () => {
+      schedule();
+      scheduleMail();
+    },
+    stop: () => {
+      void task?.stop();
+      void mailTask?.stop();
+    },
+  };
 }

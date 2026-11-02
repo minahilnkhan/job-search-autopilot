@@ -14,4 +14,10 @@ export const config = {
   generatedDir: path.resolve(ROOT, "data/generated"), // resumes as PDF/DOCX (gitignored)
   chromiumPath: process.env.CHROMIUM_PATH?.trim() || undefined, // optional override for PDF rendering
   anthropicApiKey: process.env.ANTHROPIC_API_KEY?.trim() || null,
+  // The job-search inbox, read once a day (read-only). An app password, never your account password.
+  mail: {
+    address: process.env.MAIL_ADDRESS?.trim() || null,
+    appPassword: process.env.MAIL_APP_PASSWORD?.replace(/\s+/g, "") || null, // Google shows it in groups of four
+    host: process.env.MAIL_IMAP_HOST?.trim() || "imap.gmail.com",
+  },
 };

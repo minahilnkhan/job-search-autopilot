@@ -73,6 +73,8 @@ The app's places are **Today**, **Progress**, **Applications**, **Resumes**, **J
 
 **Applications** merges the review queue and the tracker: To review, Needs a fix, Ready to submit, Submitted, Interviewing, Closed.
 
+**Inbox** (optional): once a day at 8pm, the app reads new mail in your job-search inbox, keeps only emails about applications you've sent, and puts suggested status changes on Today: *Mark rejected*, *Move to recruiter screen*, and so on, each with the email's subject, sender, an excerpt and the phrase that decided it. You accept or dismiss each one. The only thing it records without asking is "application received". The mailbox is opened read-only: it never sends, deletes or marks mail read. Set it up in Settings → Job-search inbox (a Google app password in `.env`).
+
 **Resumes** holds every resume you keep: the two bases (FDE and SWE) that applications are built from, plus named versions tagged by role type (Applied AI, Technical consulting, Technical education…), filterable by tag. Each one is edited in place on a page laid out like the PDF: click a line and type, Enter for a new bullet, hover a line to move or delete it, ⌘S to save. Every save runs the same Truth Check and one-page PDF build as before, and problem lines are underlined on the page. "Edit as plain text" switches to the underlying format. Versions don't feed applications; they're for keeping and polishing a resume per role type.
 
 ## Filling forms in your own Chrome

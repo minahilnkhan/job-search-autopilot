@@ -193,6 +193,47 @@ export const resumeLibrary = sqliteTable("resume_library", {
     .default(sql`(unixepoch() * 1000)`),
 });
 
+/**
+ * Emails from the job-search inbox that matched one of your applications.
+ * Only these are stored (sender, subject, date, a short excerpt); the rest of
+ * the inbox is never saved. Each one carries what the app thinks it means and
+ * the status change it suggests, which you accept or dismiss.
+ */
+export const emailMessages = sqliteTable(
+  "email_messages",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    messageId: text("message_id").notNull(), // the email's Message-ID header, for dedupe
+    fromAddress: text("from_address").notNull(),
+    fromName: text("from_name"),
+    subject: text("subject").notNull(),
+    receivedAt: integer("received_at", { mode: "timestamp_ms" }).notNull(),
+    snippet: text("snippet").notNull(),
+    applicationId: integer("application_id").references(() => applications.id),
+    /** Other applications it could belong to (same company), when the match wasn't certain. */
+    candidateIds: text("candidate_ids", { mode: "json" }).$type<number[]>(),
+    kind: text("kind", { enum: ["received", "rejection", "assessment", "screen", "interview", "offer", "other"] }).notNull(),
+    kindSource: text("kind_source", { enum: ["rule", "model"] }).notNull(),
+    kindReason: text("kind_reason"), // the phrase that decided it, or the model's one-line reason
+    suggestedStatus: text("suggested_status", { enum: APPLICATION_STATUSES }),
+    state: text("state", { enum: ["pending", "accepted", "dismissed", "auto", "info"] }).notNull(),
+    decidedAt: integer("decided_at", { mode: "timestamp_ms" }),
+    createdAt: createdAt(),
+  },
+  (t) => [uniqueIndex("email_messages_message_id_idx").on(t.messageId)]
+);
+
+/** One row per inbox check, so the app knows when it last looked and what happened. */
+export const mailChecks = sqliteTable("mail_checks", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  trigger: text("trigger", { enum: ["schedule", "catch_up", "manual"] }).notNull(),
+  startedAt: integer("started_at", { mode: "timestamp_ms" }).notNull(),
+  finishedAt: integer("finished_at", { mode: "timestamp_ms" }),
+  status: text("status", { enum: ["running", "ok", "failed"] }).notNull(),
+  stats: text("stats", { mode: "json" }).$type<{ scanned: number; matched: number; suggestions: number; recorded: number; costUsd: number }>(),
+  error: text("error"),
+});
+
 const BUCKETS = ["applications", "projects", "prep"] as const;
 
 export const timeLogs = sqliteTable("time_logs", {

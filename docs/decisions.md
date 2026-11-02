@@ -279,3 +279,20 @@ A named version is a role tag and a name on top of ordinary `resume_versions` ro
 ### Inline Truth Check marks only while the line is unchanged
 Problems from the last save are underlined on the matching line, but only while that line's text is exactly what was checked. Once you edit it, the mark goes away until the next save re-checks it, so the page never shows a stale verdict on new wording.
 
+## Inbox monitoring
+
+### IMAP with an app password, not the Gmail API
+The Gmail API would mean a Google Cloud project, an OAuth consent screen and a refresh token to store, for a tool one person runs on a laptop. IMAP with a Google app password needs none of that, works the same for Outlook or iCloud, and the credential is mail-only and revocable from the Google account at any time. It lives only in `.env`, like the API key.
+
+### Read-only, and most of the inbox is never downloaded
+The mailbox is opened with EXAMINE (read-only), so the app can't mark mail read, move it, delete it or send. It lists only envelopes (sender, subject, date) of mail since the last check and downloads a body only when the sender is an ATS or a company you applied to, or the subject names one. Verified against a local IMAP server: an unrelated email's body was never fetched, and no message's flags changed. Only emails matched to an application are stored, and only their sender, subject, date and a 400-character excerpt.
+
+### Rules first; the model only for what rules can't place
+Most ATS mail is formulaic ("we will not be moving forward", "share your availability"), so keyword rules decide it, for free and in a way you can see ("Matched on 'love to chat with you'"). Rules are checked strongest first, so "thank you for applying… unfortunately" reads as a rejection, not a receipt. Only an email that matched an application but no rule goes to Haiku, as data with a fixed set of labels to choose from; whatever the email says, the worst it can do is produce a wrong suggestion you dismiss.
+
+### Suggest, then you confirm. Only "received" is automatic
+A misread email that quietly marked a live application rejected would cost more than the automation saves: you'd never follow up on it. So every status change waits for one click, and goes through the same transition rules as changing it by hand. "Application received" is recorded on its own because it changes nothing you'd act on. Suggestions never move an application backwards or reopen one that's ended, and when you applied to a company twice and the email doesn't name the role, it asks which.
+
+### Once a day at 8pm, with a catch-up
+It runs at 8pm in your timezone. If the laptop was asleep then, the next start checks once, because the rule is "the most recent 8pm has passed since the last good check", not "it's after 8pm". The Settings button exists for testing the setup.
+

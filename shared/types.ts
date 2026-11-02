@@ -507,3 +507,41 @@ export type ProjectRecord = {
 };
 
 export type ProjectPatch = Partial<Pick<ProjectRecord, "title" | "summary" | "repoUrl" | "status" | "resultMetric" | "skills">>;
+
+// ---- Inbox: the once-a-day check of the job-search email -----------------------
+
+export type InboxApp = { id: number; status: ApplicationStatus; companyName: string; jobTitle: string };
+
+export type InboxItem = {
+  id: number;
+  from: string;
+  subject: string;
+  receivedAt: number;
+  snippet: string;
+  kind: "received" | "rejection" | "assessment" | "screen" | "interview" | "offer" | "other";
+  kindLabel: string;
+  kindSource: "rule" | "model";
+  /** The words that decided it, or why it couldn't be decided. */
+  kindReason: string | null;
+  /** What accepting it would change the application to (null: nothing to change). */
+  suggestedStatus: ApplicationStatus | null;
+  state: "pending" | "accepted" | "dismissed" | "auto" | "info";
+  application: InboxApp | null;
+  /** When the email could be about more than one of your applications at that company. */
+  candidates: InboxApp[];
+  gmailUrl: string;
+};
+
+export type InboxState = {
+  configured: boolean;
+  unavailable: string | null;
+  address: string | null;
+  /** Set when the Settings email (what forms are filled with) differs from the watched inbox. */
+  fillsWithOtherAddress: string | null;
+  checkAt: string;
+  lastCheck: { at: number; status: "ok" | "failed"; error: string | null; stats: { scanned: number; matched: number; suggestions: number; recorded: number; costUsd: number } | null } | null;
+  running: boolean;
+  pending: InboxItem[];
+  recent: InboxItem[];
+};
+

@@ -7,6 +7,7 @@ import { makeAnthropicAnswerWriter, type AnswerWriter } from "./answers";
 import { makeAnthropicChat, makeAnthropicFollowUp, type ChatWriter, type FollowUpWriter } from "./chat";
 import { makeAnthropicCheckIn, type CheckInWriter } from "./checkIn";
 import { makeAnthropicMentorChat, type MentorChat } from "./mentorChat";
+import { makeAnthropicEmailClassifier, type EmailClassifier } from "./classifyEmail";
 import type { Settings } from "../../../shared/types";
 
 /** Real scorer, or a plain-words reason it can't run yet. */
@@ -90,3 +91,10 @@ export function anthropicMentorChatFactory(settings: Settings): { chat: MentorCh
     throw err;
   }
 }
+
+/** Labels the job emails the keyword rules can't place (the small scoring model: it's a one-word answer). */
+export function anthropicEmailClassifierFactory(settings: Settings): { classify: EmailClassifier } | { unavailable: string } {
+  if (!config.anthropicApiKey) return { unavailable: "no ANTHROPIC_API_KEY in .env" };
+  return { classify: makeAnthropicEmailClassifier({ apiKey: config.anthropicApiKey, model: settings.models.scoring }) };
+}
+

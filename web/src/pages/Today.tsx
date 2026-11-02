@@ -5,7 +5,8 @@ import { ScoreBadge, ScoreBreakdownView } from "../components/Score";
 import type { DaySummary } from "../lib/api";
 import { PreparingTray, type Preparing } from "../components/PreparingTray";
 import { TaskList, Timer } from "../components/Tracking";
-import type { CheckInRecord, DailyCheckInOutput, RunningTimer, Task } from "../../../shared/types";
+import { InboxCard, InboxStatusLine } from "../components/Inbox";
+import type { CheckInRecord, DailyCheckInOutput, InboxState, RunningTimer, Task } from "../../../shared/types";
 
 const EVERIFY_TEXT = { confirmed: "E-Verify confirmed", likely: "E-Verify likely", unknown: "E-Verify not checked" } as const;
 const SPONSOR_TEXT = { yes: "Sponsors visas", no: "No sponsorship", unstated: "Sponsorship not stated" } as const;
@@ -233,8 +234,10 @@ export function Today({ onJobsChanged }: { onJobsChanged: () => void }) {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [timer, setTimer] = useState<RunningTimer | null>(null);
   const [checkInBusy, setCheckInBusy] = useState(false);
+  const [inbox, setInbox] = useState<InboxState | null>(null);
 
   const loadDay = useCallback(async () => {
+    api.inbox().then(setInbox).catch(() => {});
     const [ci, tk, time] = await Promise.all([api.checkIns(), api.tasks(), api.time()]);
     setCheckIn(ci.daily);
     setTasks(tk.tasks);
@@ -392,6 +395,15 @@ export function Today({ onJobsChanged }: { onJobsChanged: () => void }) {
         onChanged={() => void loadDay()}
       />
 
+      <InboxCard
+        inbox={inbox}
+        onChanged={() => {
+          void loadDay();
+          void refreshSide();
+          onJobsChanged();
+        }}
+      />
+
       <section className="flex flex-wrap items-start gap-6">
         <ol className="flex min-w-0 flex-[999_1_640px] flex-col gap-3">
           {/* Step 1: the deck, open until it's empty. */}
@@ -512,6 +524,9 @@ export function Today({ onJobsChanged }: { onJobsChanged: () => void }) {
             </div>
           )}
           <SkillsToBuild />
+          <div className="px-1">
+            <InboxStatusLine inbox={inbox} />
+          </div>
         </aside>
       </section>
     </div>

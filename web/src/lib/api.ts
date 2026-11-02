@@ -3,6 +3,8 @@ import type {
   ApplicationSummary,
   BaseResume,
   ResumeDoc,
+  InboxItem,
+  InboxState,
   RoleTag,
   BaseType,
   Company,
@@ -86,6 +88,12 @@ export const api = {
   bases: () => request<BaseResume[]>("GET", "/api/resumes/bases"),
   saveBase: (type: BaseType, text: string) => request<BaseResume>("PUT", `/api/resumes/bases/${type}`, { text }),
   // The Resumes tab: both bases plus named versions. key is "base:fde", "base:swe" or "lib:<id>".
+  // The job-search inbox (checked at 8pm; checkInbox is for testing the setup).
+  inbox: () => request<InboxState>("GET", "/api/inbox"),
+  checkInbox: () =>
+    request<{ scanned: number; matched: number; suggestions: number; recorded: number; costUsd: number; note?: string }>("POST", "/api/inbox/check", {}),
+  acceptInbox: (id: number, applicationId?: number) => request<InboxItem>("POST", `/api/inbox/${id}/accept`, applicationId ? { applicationId } : {}),
+  dismissInbox: (id: number) => request<{ ok: boolean }>("POST", `/api/inbox/${id}/dismiss`, {}),
   resumeDocs: () => request<ResumeDoc[]>("GET", "/api/resumes"),
   saveResumeDoc: (key: string, text: string) => request<ResumeDoc>("PUT", `/api/resumes/${encodeURIComponent(key)}`, { text }),
   createResumeVersion: (body: { name: string; roleTag: RoleTag; from: string }) => request<ResumeDoc>("POST", "/api/resumes", body),

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import type { Settings as SettingsT } from "../../../shared/types";
 import { api } from "../lib/api";
+import { InboxSetup } from "../components/Inbox";
 
 function NumberField({ label, value, onChange, step = 1 }: { label: string; value: number; onChange: (n: number) => void; step?: number }) {
   return (
@@ -135,6 +136,7 @@ export function Settings() {
       </fieldset>
 
       <ExtensionSetup />
+      <InboxSetup />
 
       <fieldset className="panel space-y-3 p-5">
         <legend className="px-1 text-lg font-semibold">Apply in your own browser</legend>

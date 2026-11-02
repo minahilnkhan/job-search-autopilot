@@ -4,7 +4,7 @@ import { buildApp } from "./app";
 import { createDb, runMigrations } from "./db/client";
 import { seed } from "./db/seed";
 import { config } from "./config";
-import { anthropicAnswerFactory, anthropicChatFactory, anthropicCheckInFactory, anthropicFollowUpFactory, anthropicMentorChatFactory, anthropicScorerFactory, anthropicTailorFactory } from "./llm/factory";
+import { anthropicAnswerFactory, anthropicChatFactory, anthropicCheckInFactory, anthropicEmailClassifierFactory, anthropicFollowUpFactory, anthropicMentorChatFactory, anthropicScorerFactory, anthropicTailorFactory } from "./llm/factory";
 import { makeRenderer } from "./render/renderer";
 import { loadTruthFacts } from "./services/truth";
 import { importBasesIfMissing } from "./services/resumes";
@@ -12,6 +12,8 @@ import type { PrepDeps } from "./services/applications";
 import { fetchBoard } from "./sources/boards";
 import { startScheduler } from "./scheduler";
 import type { CheckInDeps } from "./services/checkIns";
+import type { MailDeps } from "./services/mail";
+import { imapSource } from "./mail/imap";
 import { markInterruptedRuns, rebuildTodaysShortlist, recheckBoardJobs, type PipelineDeps } from "./services/pipeline";
 
 const db = createDb();
@@ -34,14 +36,23 @@ const prep: PrepDeps = { getTailor: anthropicTailorFactory, renderer: makeRender
 // Assisted submit opens a visible browser window on this machine.
 const submit: SubmitDeps = { openPage: headedBrowser(config.chromiumPath), getAnswerWriter: anthropicAnswerFactory, getChat: anthropicChatFactory, getFollowUp: anthropicFollowUpFactory, facts: loadTruthFacts };
 const checkIn: CheckInDeps = { getCheckIn: anthropicCheckInFactory, getMentorChat: anthropicMentorChatFactory };
-const app = buildApp(db, { logger: true, pipeline, prep, submit, checkIn, onSettingsChanged: () => reschedule() });
+// The job-search inbox, read once a day. Credentials come only from .env.
+const mail: MailDeps = {
+  getSource: () => {
+    const m = config.mail;
+    if (!m.address || !m.appPassword) return { unavailable: "add MAIL_ADDRESS and MAIL_APP_PASSWORD to .env, then restart" };
+    return { source: imapSource({ host: m.host, user: m.address, password: m.appPassword }), address: m.address };
+  },
+  getClassifier: anthropicEmailClassifierFactory,
+};
+const app = buildApp(db, { logger: true, pipeline, prep, submit, checkIn, mail, onSettingsChanged: () => reschedule() });
 
 // Bind to localhost only: this is a personal tool with no auth.
 await app.listen({ port: config.port, host: "127.0.0.1" });
 
 // The schedule only fires while this process is running (it's a local app).
 // If the laptop was asleep at run time, the next start catches up.
-const scheduler = startScheduler(db, pipeline, checkIn, (msg) => app.log.info(msg));
+const scheduler = startScheduler(db, pipeline, checkIn, (msg) => app.log.info(msg), mail);
 
 // First run: pick up data/private/resume_fde.md and resume_swe.md as base resumes.
 importBasesIfMissing(db, prep).catch((err) => app.log.warn(`Base resume import skipped: ${(err as Error).message}`));

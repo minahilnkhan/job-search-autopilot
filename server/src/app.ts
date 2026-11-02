@@ -9,6 +9,8 @@ import { applicationRoutes } from "./routes/applications";
 import { submissionRoutes } from "./routes/submissions";
 import { extensionRoutes } from "./routes/extension";
 import { checkInRoutes, projectRoutes, trackingRoutes } from "./routes/tracking";
+import { mailRoutes } from "./routes/mail";
+import type { MailDeps } from "./services/mail";
 import type { CheckInDeps } from "./services/checkIns";
 import type { SubmitDeps } from "./services/submissions";
 import type { PrepDeps } from "./services/applications";
@@ -23,7 +25,7 @@ import type { PipelineDeps } from "./services/pipeline";
  */
 export function buildApp(
   db: DB,
-  opts: { logger?: boolean; pipeline: PipelineDeps; prep: PrepDeps; submit?: SubmitDeps; checkIn?: CheckInDeps; onSettingsChanged?: () => void }
+  opts: { logger?: boolean; pipeline: PipelineDeps; prep: PrepDeps; submit?: SubmitDeps; checkIn?: CheckInDeps; mail?: MailDeps; onSettingsChanged?: () => void }
 ) {
   const app = Fastify({ logger: opts.logger ?? false, bodyLimit: 1024 * 1024 });
 
@@ -60,5 +62,6 @@ export function buildApp(
   trackingRoutes(app, db);
   projectRoutes(app, db);
   checkInRoutes(app, db, opts.checkIn ?? {});
+  mailRoutes(app, db, opts.mail ?? {});
   return app;
 }
