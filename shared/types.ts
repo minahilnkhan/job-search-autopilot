@@ -334,6 +334,31 @@ export type BaseResume = {
   hasPdf: boolean;
 };
 
+/** Role types a resume version can be tagged with. The two bases are FDE and SWE. */
+export const ROLE_TAGS = ["fde", "swe", "applied_ai", "consulting", "education", "other"] as const;
+export type RoleTag = (typeof ROLE_TAGS)[number];
+
+/**
+ * One resume in the Resumes tab: either one of the two bases (what Tier B
+ * applications send and Tier A tailoring starts from) or a named version you
+ * keep beside them.
+ */
+export type ResumeDoc = {
+  /** "base:fde", "base:swe", or "lib:<id>" */
+  key: string;
+  kind: "base" | "version";
+  name: string;
+  roleTag: RoleTag;
+  baseType: BaseType;
+  /** The resume_versions row behind the current text (changes on every save). */
+  versionId: number | null;
+  text: string;
+  truth: TruthReport | null;
+  pdfPages: number | null;
+  hasPdf: boolean;
+  updatedAt: number | null;
+};
+
 // ---- Phase 4: assisted submit -------------------------------------------------
 
 export type Ats = "greenhouse" | "lever" | "ashby" | "other";

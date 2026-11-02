@@ -264,3 +264,18 @@ The free-form chat gets the whole prompt (she could ask about anything) and the 
 
 ### A project isn't shipped without a repo and a measured result
 The portfolio module says a project goes on the resume once it's built, on GitHub, and has one honest measured result. "Mark it shipped" enforces exactly that, since the whole point is that it becomes a resume line.
+
+## Resumes tab
+
+### A structured page editor, not a rich-text editor or Google Docs
+The ask was "a mini Google Docs." Two-way Google Docs sync was ruled out: every edit made there would skip the Truth Check unless re-imported and re-checked, so it would add OAuth, a new stored secret and a sync loop without removing the check. A generic rich-text editor (TipTap, Quill) was ruled out too: it edits free-form HTML, and the resume is a fixed structure (sections → entries → bullets) that the PDF, the DOCX, the Truth Check and the tailoring diff all read. Converting rich text back into that structure is where formatting would silently break. So the editor edits the structure itself: each line is an auto-growing text box styled like the PDF. It feels like a document and can't produce something the renderer can't print.
+
+### One parser, shared
+The plain-text resume format moved from the server to `shared/resumeFormat.ts`, so the page editor parses and writes it with the same code the server checks and renders from. Two copies of a parser are two chances to disagree.
+
+### Versions are labels, not a second application path
+A named version is a role tag and a name on top of ordinary `resume_versions` rows (parent set, no job), so it gets history and the identical Truth Check and PDF for free. It deliberately doesn't attach to applications: the bases stay the single source for Tier B sends and Tier A tailoring, which keeps "which resume did this application use?" answerable. The bases' names and tags are locked, and they can't be deleted, because applications depend on them.
+
+### Inline Truth Check marks only while the line is unchanged
+Problems from the last save are underlined on the matching line, but only while that line's text is exactly what was checked. Once you edit it, the mark goes away until the next save re-checks it, so the page never shows a stale verdict on new wording.
+

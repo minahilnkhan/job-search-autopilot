@@ -2,6 +2,8 @@ import type {
   ApplicationDetail,
   ApplicationSummary,
   BaseResume,
+  ResumeDoc,
+  RoleTag,
   BaseType,
   Company,
   CreateJobRequest,
@@ -83,6 +85,12 @@ export const api = {
   // Phase 3
   bases: () => request<BaseResume[]>("GET", "/api/resumes/bases"),
   saveBase: (type: BaseType, text: string) => request<BaseResume>("PUT", `/api/resumes/bases/${type}`, { text }),
+  // The Resumes tab: both bases plus named versions. key is "base:fde", "base:swe" or "lib:<id>".
+  resumeDocs: () => request<ResumeDoc[]>("GET", "/api/resumes"),
+  saveResumeDoc: (key: string, text: string) => request<ResumeDoc>("PUT", `/api/resumes/${encodeURIComponent(key)}`, { text }),
+  createResumeVersion: (body: { name: string; roleTag: RoleTag; from: string }) => request<ResumeDoc>("POST", "/api/resumes", body),
+  updateResumeVersion: (key: string, body: { name?: string; roleTag?: RoleTag }) => request<ResumeDoc>("PATCH", `/api/resumes/${encodeURIComponent(key)}`, body),
+  deleteResumeVersion: (key: string) => request<{ ok: boolean }>("DELETE", `/api/resumes/${encodeURIComponent(key)}`),
   prepare: (jobId: number) => request<ApplicationDetail>("POST", "/api/applications", { jobId }),
   /** Accept from the deck: returns at once; the application appears in Review when ready. */
   prepareInBackground: (jobId: number) => request<{ jobId: number; preparing: boolean }>("POST", "/api/applications", { jobId, background: true }),

@@ -138,7 +138,7 @@ function Detail({ id, onChanged, onOpen }: { id: number; onChanged: () => void; 
             value={lineEdits[line.id] ?? line.text} onChange={(e) => setLineEdits((m) => ({ ...m, [line.id]: e.target.value }))} />
           {issue.kind === "placeholder" && (
             <p className="text-sm text-ink-soft">
-              This came from your base resume. Fix it on the <a className="text-accent underline underline-offset-2" href="#/settings/resumes">Resumes page</a> too, so the next application doesn't have it.
+              This came from your base resume. Fix it on the <a className="text-accent underline underline-offset-2" href="#/resumes">Resumes page</a> too, so the next application doesn't have it.
             </p>
           )}
         </div>
@@ -165,7 +165,7 @@ function Detail({ id, onChanged, onOpen }: { id: number; onChanged: () => void; 
     // Company, title and date lines aren't editable per application.
     return (
       <p className="text-sm text-ink-soft">
-        Change this line on the <a className="text-accent underline underline-offset-2" href="#/settings/resumes">Resumes page</a>, then press Rebuild from base resume.
+        Change this line on the <a className="text-accent underline underline-offset-2" href="#/resumes">Resumes page</a>, then press Rebuild from base resume.
       </p>
     );
   }

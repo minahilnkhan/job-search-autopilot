@@ -20,7 +20,7 @@ export function PreparingTray({ items, onChanged }: { items: Preparing[]; onChan
           <p className="text-fail">
             {p.jobTitle} at {p.companyName} couldn't be prepared: {p.error}{" "}
             {/base resume/i.test(p.error ?? "") && (
-              <a className="font-medium text-accent underline underline-offset-2" href="#/settings/resumes">Open Resumes</a>
+              <a className="font-medium text-accent underline underline-offset-2" href="#/resumes">Open Resumes</a>
             )}
           </p>
           <div className="flex gap-2">

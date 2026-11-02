@@ -43,11 +43,30 @@ function latestBaseRow(db: DB, type: BaseType) {
 
 /** Saves a new version of a base resume (history is kept), checks it and renders it. */
 export async function saveBase(db: DB, type: BaseType, text: string, deps: ResumeDeps, now = new Date()) {
-  const content = parseResume(text);
-  const truth = runTruthCheck({ lines: resumeCheckLines(content) }, deps.facts(), now);
-  const row = db.insert(resumeVersions).values({ baseType: type, content, truthCheckStatus: truth.pass ? "pass" : "fail" }).returning().get();
-  const out = path.join(deps.generatedDir ?? config.generatedDir, "base", `${type}-${row.id}`);
-  const render = await deps.renderer(content, out);
+  await saveVersionRow(db, { baseType: type, parentId: null, content: parseResume(text) }, deps, "base", now);
+  return getBase(db, type);
+}
+
+/**
+ * Inserts one resume_versions row, runs the Truth Check, renders the PDF and
+ * DOCX, and records both on the row. Bases and named versions both save this
+ * way, so a version is held to exactly the same checks as a base.
+ */
+export async function saveVersionRow(
+  db: DB,
+  v: { baseType: BaseType; parentId: number | null; content: ResumeContent },
+  deps: ResumeDeps,
+  folder: "base" | "library",
+  now = new Date()
+) {
+  const truth = runTruthCheck({ lines: resumeCheckLines(v.content) }, deps.facts(), now);
+  const row = db
+    .insert(resumeVersions)
+    .values({ baseType: v.baseType, parentId: v.parentId, content: v.content, truthCheckStatus: truth.pass ? "pass" : "fail" })
+    .returning()
+    .get();
+  const out = path.join(deps.generatedDir ?? config.generatedDir, folder, folder === "base" ? `${v.baseType}-${row.id}` : `v-${row.id}`);
+  const render = await deps.renderer(v.content, out);
   const report = withRenderIssues(truth, render);
   db.update(resumeVersions)
     .set({
@@ -59,7 +78,7 @@ export async function saveBase(db: DB, type: BaseType, text: string, deps: Resum
     })
     .where(eq(resumeVersions.id, row.id))
     .run();
-  return getBase(db, type);
+  return row.id;
 }
 
 /** First run: import data/private/resume_<type>.md if the database has no base yet. */

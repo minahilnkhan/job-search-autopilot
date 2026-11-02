@@ -173,6 +173,26 @@ export const resumeVersions = sqliteTable("resume_versions", {
   createdAt: createdAt(),
 });
 
+/**
+ * Named resume versions you keep beside the two bases (e.g. "Applied AI",
+ * "Technical education"). Each save is a new resume_versions row, so a version
+ * keeps its history the way a base does; this row points at the latest one.
+ * Those rows have a parent_id and no job_id, which keeps them out of the base
+ * lookup and away from tailored applications.
+ */
+export const resumeLibrary = sqliteTable("resume_library", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  name: text("name").notNull(),
+  roleTag: text("role_tag").notNull(),
+  versionId: integer("version_id")
+    .notNull()
+    .references(() => resumeVersions.id),
+  createdAt: createdAt(),
+  updatedAt: integer("updated_at", { mode: "timestamp_ms" })
+    .notNull()
+    .default(sql`(unixepoch() * 1000)`),
+});
+
 const BUCKETS = ["applications", "projects", "prep"] as const;
 
 export const timeLogs = sqliteTable("time_logs", {

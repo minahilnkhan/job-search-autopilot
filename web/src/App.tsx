@@ -12,27 +12,28 @@ import { Resumes } from "./pages/Resumes";
 import { Applications } from "./pages/Applications";
 
 // Hash routing: a handful of pages don't need a router dependency.
-// Four places in the nav; everything else hangs off one of them.
+// A few places in the nav; everything else hangs off one of them.
 const NAV = [
   { path: "#/today", label: "Today" },
   { path: "#/progress", label: "Progress" },
   { path: "#/applications", label: "Applications" },
+  { path: "#/resumes", label: "Resumes" },
   { path: "#/jobs", label: "Jobs" },
   { path: "#/settings", label: "Settings" },
 ] as const;
-const PAGES = ["#/today", "#/progress", "#/applications", "#/review", "#/jobs", "#/add", "#/settings", "#/settings/resumes", "#/settings/companies"] as const;
+const PAGES = ["#/today", "#/progress", "#/applications", "#/review", "#/resumes", "#/jobs", "#/add", "#/settings", "#/settings/companies"] as const;
 type Page = (typeof PAGES)[number];
 // Old addresses still work.
-const MOVED: Record<string, string> = { "#/tracker": "#/applications?stage=submitted", "#/resumes": "#/settings/resumes", "#/companies": "#/settings/companies" };
+const MOVED: Record<string, string> = { "#/tracker": "#/applications?stage=submitted", "#/settings/resumes": "#/resumes", "#/companies": "#/settings/companies" };
 const SECTION: Record<Page, string> = {
   "#/today": "#/today",
   "#/progress": "#/progress",
   "#/applications": "#/applications",
+  "#/resumes": "#/resumes",
   "#/review": "#/applications",
   "#/jobs": "#/jobs",
   "#/add": "#/jobs",
   "#/settings": "#/settings",
-  "#/settings/resumes": "#/settings",
   "#/settings/companies": "#/settings",
 };
 
@@ -59,7 +60,6 @@ function useHashRoute(): Page {
 
 const SETTINGS_TABS = [
   { path: "#/settings", label: "General" },
-  { path: "#/settings/resumes", label: "Resumes" },
   { path: "#/settings/companies", label: "Companies" },
 ] as const;
 
@@ -133,7 +133,7 @@ export default function App() {
         {route === "#/jobs" && <Jobs jobs={jobs} setJobs={setJobs} />}
         {route === "#/add" && <AddJob onSaved={loadJobs} />}
         {route === "#/settings" && <Settings />}
-        {route === "#/settings/resumes" && <Resumes />}
+        {route === "#/resumes" && <Resumes />}
         {route === "#/settings/companies" && <Companies onJobsChanged={loadJobs} />}
       </main>
     </div>

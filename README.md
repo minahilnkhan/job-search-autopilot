@@ -64,7 +64,7 @@ The **Review** page shows the job, its score and gaps, each resume change as bef
 
 ## How a day works
 
-The app is four places: **Today**, **Applications**, **Jobs** and **Settings** (with Resumes and Companies inside it). Today is a four-step checklist:
+The app's places are **Today**, **Progress**, **Applications**, **Resumes**, **Jobs** and **Settings** (with Companies inside it). Today is a four-step checklist:
 
 1. **Pick today's jobs**: a deck of Tier A then Tier B picks. Swipe or use ← → to accept or skip.
 2. **Review and approve**: one application at a time, with ‹ › to the next. What changed in the resume, and the Truth Check result up front; answers and the score folded away.
@@ -72,6 +72,8 @@ The app is four places: **Today**, **Applications**, **Jobs** and **Settings** (
 4. **Follow up**: Tier A applications a week after submitting, with **Draft a follow-up**.
 
 **Applications** merges the review queue and the tracker: To review, Needs a fix, Ready to submit, Submitted, Interviewing, Closed.
+
+**Resumes** holds every resume you keep: the two bases (FDE and SWE) that applications are built from, plus named versions tagged by role type (Applied AI, Technical consulting, Technical education…), filterable by tag. Each one is edited in place on a page laid out like the PDF: click a line and type, Enter for a new bullet, hover a line to move or delete it, ⌘S to save. Every save runs the same Truth Check and one-page PDF build as before, and problem lines are underlined on the page. "Edit as plain text" switches to the underlying format. Versions don't feed applications; they're for keeping and polishing a resume per role type.
 
 ## Filling forms in your own Chrome
 

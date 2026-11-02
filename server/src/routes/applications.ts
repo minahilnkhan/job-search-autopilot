@@ -20,6 +20,8 @@ import {
   type PrepDeps,
 } from "../services/applications";
 import { getBase, saveBase } from "../services/resumes";
+import { createVersion, deleteVersion, listResumeDocs, resumeDocFile, saveResumeDoc, updateVersionMeta } from "../services/resumeLibrary";
+import { ROLE_TAGS } from "../../../shared/types";
 import { ResumeFormatError } from "../domain/resumeFormat";
 import { ConflictError, NotFoundError, getJob } from "../services/jobs";
 import { jobs } from "../db/schema";
@@ -62,6 +64,46 @@ export function applicationRoutes(app: FastifyInstance, db: DB, deps: PrepDeps) 
     const p = kind === "pdf" ? row?.filePathPdf : row?.filePathDocx;
     if (!row || !p || !fs.existsSync(p)) throw new NotFoundError(`No ${kind.toUpperCase()} for the ${type.toUpperCase()} base yet`);
     return sendFile(reply, { path: p, filename: `${row.content.name.replace(/[^A-Za-z0-9]+/g, "_")}_Resume_${type.toUpperCase()}.${kind}` }, kind === "pdf");
+  });
+
+  // ---- The Resumes tab: both bases plus named versions tagged by role type.
+  // :key is "base:fde", "base:swe" or "lib:<id>".
+  const docKey = z.object({ key: z.string().regex(/^(base:(fde|swe)|lib:\d+)$/, "Unknown resume") });
+  const roleTag = z.enum(ROLE_TAGS);
+
+  app.get("/api/resumes", async () => listResumeDocs(db));
+
+  app.post("/api/resumes", async (req) => {
+    const b = z.object({ name: z.string().trim().min(1).max(80), roleTag, from: docKey.shape.key }).parse(req.body);
+    return createVersion(db, b, deps);
+  });
+
+  app.put("/api/resumes/:key", async (req) => {
+    const { key } = docKey.parse(req.params);
+    const { text } = z.object({ text: z.string().min(1).max(40_000) }).parse(req.body);
+    try {
+      return await saveResumeDoc(db, key, text, deps);
+    } catch (err) {
+      if (err instanceof ResumeFormatError) throw new ConflictError(err.message);
+      throw err;
+    }
+  });
+
+  app.patch("/api/resumes/:key", async (req) => {
+    const { key } = docKey.parse(req.params);
+    const b = z.object({ name: z.string().trim().min(1).max(80).optional(), roleTag: roleTag.optional() }).parse(req.body);
+    return updateVersionMeta(db, key, b);
+  });
+
+  app.delete("/api/resumes/:key", async (req) => {
+    deleteVersion(db, docKey.parse(req.params).key);
+    return { ok: true };
+  });
+
+  app.get("/api/resumes/:key/file.:kind", async (req, reply) => {
+    const { key } = docKey.parse(req.params);
+    const kind = z.enum(["pdf", "docx"]).parse((req.params as { kind: string }).kind);
+    return sendFile(reply, resumeDocFile(db, key, kind), kind === "pdf");
   });
 
   // ---- Applications
