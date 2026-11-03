@@ -8,6 +8,7 @@ import { makeAnthropicChat, makeAnthropicFollowUp, type ChatWriter, type FollowU
 import { makeAnthropicCheckIn, type CheckInWriter } from "./checkIn";
 import { makeAnthropicMentorChat, type MentorChat } from "./mentorChat";
 import { makeAnthropicEmailClassifier, type EmailClassifier } from "./classifyEmail";
+import { makeAnthropicOutreachDrafter, type OutreachDrafter } from "./outreach";
 import type { Settings } from "../../../shared/types";
 
 /** Real scorer, or a plain-words reason it can't run yet. */
@@ -98,3 +99,14 @@ export function anthropicEmailClassifierFactory(settings: Settings): { classify:
   return { classify: makeAnthropicEmailClassifier({ apiKey: config.anthropicApiKey, model: settings.models.scoring }) };
 }
 
+
+/** Outreach drafts for the Network tab (tailoring model: tone matters here), or why it can't run. */
+export function anthropicOutreachFactory(settings: Settings): { draft: OutreachDrafter } | { unavailable: string } {
+  if (!config.anthropicApiKey) return { unavailable: "no ANTHROPIC_API_KEY in .env" };
+  try {
+    return { draft: makeAnthropicOutreachDrafter({ apiKey: config.anthropicApiKey, model: settings.models.tailoring, context: loadMentorContext() }) };
+  } catch (err) {
+    if (err instanceof MissingContextError) return { unavailable: err.message };
+    throw err;
+  }
+}

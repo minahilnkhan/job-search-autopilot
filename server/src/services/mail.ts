@@ -10,6 +10,8 @@ import { getSettings, localDate, localTime } from "./settings";
 import { markSubmitted, setTrackedStatus } from "./submissions";
 import { ConflictError, NotFoundError } from "./jobs";
 import { addDays } from "../domain/week";
+import { acceptanceName } from "../domain/outreach";
+import { hasPendingInvites, recordAcceptances } from "./network";
 import type { ApplicationStatus, InboxItem, InboxState, Settings } from "../../../shared/types";
 
 // The once-a-day inbox check. It reads mail since the last check, keeps only
@@ -88,19 +90,31 @@ export async function runMailCheck(db: DB, deps: MailDeps, trigger: "schedule" |
   running = true;
 
   const check = db.insert(mailChecks).values({ trigger, startedAt: now, status: "running" }).returning().get();
-  const stats = { scanned: 0, matched: 0, suggestions: 0, recorded: 0, costUsd: 0 };
+  const stats = { scanned: 0, matched: 0, suggestions: 0, recorded: 0, costUsd: 0, connected: 0 };
   try {
     const last = lastOkCheck(db);
     // A day of overlap: IMAP's SINCE is by date, and duplicates are dropped by Message-ID.
     const since = last ? new Date(last.startedAt.getTime() - 24 * 3600_000) : new Date(now.getTime() - FIRST_LOOKBACK_DAYS * 24 * 3600_000);
     const apps = watchedApps(db);
-    if (apps.length === 0) {
+    const invites = hasPendingInvites(db);
+    if (apps.length === 0 && !invites) {
       db.update(mailChecks).set({ status: "ok", finishedAt: new Date(), stats }).where(eq(mailChecks.id, check.id)).run();
       return { ...stats, note: "No sent applications to watch yet." };
     }
 
-    const { scanned, messages } = await src.source(since, (env) => worthOpening(env, apps));
+    // LinkedIn's "accepted your invitation" emails are read by subject only;
+    // their bodies are never downloaded.
+    const accepted: string[] = [];
+    const { scanned, messages } = await src.source(since, (env) => {
+      const name = invites ? acceptanceName(env) : null;
+      if (name) {
+        accepted.push(name);
+        return false;
+      }
+      return apps.length > 0 && worthOpening(env, apps);
+    });
     stats.scanned = scanned;
+    stats.connected = recordAcceptances(db, accepted, now);
     const settings = getSettings(db);
     const classifier = deps.getClassifier?.(settings);
 

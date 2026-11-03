@@ -6,7 +6,8 @@ import type { DaySummary } from "../lib/api";
 import { PreparingTray, type Preparing } from "../components/PreparingTray";
 import { TaskList, Timer } from "../components/Tracking";
 import { InboxCard, InboxStatusLine } from "../components/Inbox";
-import type { CheckInRecord, DailyCheckInOutput, InboxState, RunningTimer, Task } from "../../../shared/types";
+import { NetworkCard } from "./Network";
+import type { CheckInRecord, DailyCheckInOutput, InboxState, NetworkState, RunningTimer, Task } from "../../../shared/types";
 
 const EVERIFY_TEXT = { confirmed: "E-Verify confirmed", likely: "E-Verify likely", unknown: "E-Verify not checked" } as const;
 const SPONSOR_TEXT = { yes: "Sponsors visas", no: "No sponsorship", unstated: "Sponsorship not stated" } as const;
@@ -235,9 +236,11 @@ export function Today({ onJobsChanged }: { onJobsChanged: () => void }) {
   const [timer, setTimer] = useState<RunningTimer | null>(null);
   const [checkInBusy, setCheckInBusy] = useState(false);
   const [inbox, setInbox] = useState<InboxState | null>(null);
+  const [network, setNetwork] = useState<NetworkState | null>(null);
 
   const loadDay = useCallback(async () => {
     api.inbox().then(setInbox).catch(() => {});
+    api.network().then(setNetwork).catch(() => {});
     const [ci, tk, time] = await Promise.all([api.checkIns(), api.tasks(), api.time()]);
     setCheckIn(ci.daily);
     setTasks(tk.tasks);
@@ -403,6 +406,8 @@ export function Today({ onJobsChanged }: { onJobsChanged: () => void }) {
           onJobsChanged();
         }}
       />
+
+      <NetworkCard state={network} />
 
       <section className="flex flex-wrap items-start gap-6">
         <ol className="flex min-w-0 flex-[999_1_640px] flex-col gap-3">

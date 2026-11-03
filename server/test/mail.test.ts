@@ -232,4 +232,15 @@ describe("the inbox check", () => {
     expect((await req("POST", "/api/inbox/check")).status).toBe(409);
     expect((await req("GET", "/api/inbox")).body.lastCheck).toMatchObject({ status: "failed", error: "Gmail refused the sign-in." });
   });
+
+  it("marks a LinkedIn invite accepted from the email's subject, without opening it", async () => {
+    const id = await sentApp();
+    const o = (await req("POST", "/api/network/contacts", { applicationId: id, linkedinUrl: "linkedin.com/in/jane-doe", name: "Jane Doe", relationship: "team" })).body;
+    await req("POST", `/api/network/outreach/${o.id}/invite`);
+    inbox = [msg({ fromAddress: "invitations@linkedin.com", fromName: "LinkedIn", subject: "Jane Doe accepted your invitation", text: "body" })];
+    const r = await req("POST", "/api/inbox/check");
+    expect(r.body.connected).toBe(1);
+    expect(opened).toEqual([]); // the body was never downloaded
+    expect((await req("GET", "/api/network")).body.outreach[0].status).toBe("connected");
+  });
 });

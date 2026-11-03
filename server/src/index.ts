@@ -4,7 +4,7 @@ import { buildApp } from "./app";
 import { createDb, runMigrations } from "./db/client";
 import { seed } from "./db/seed";
 import { config } from "./config";
-import { anthropicAnswerFactory, anthropicChatFactory, anthropicCheckInFactory, anthropicEmailClassifierFactory, anthropicFollowUpFactory, anthropicMentorChatFactory, anthropicScorerFactory, anthropicTailorFactory } from "./llm/factory";
+import { anthropicAnswerFactory, anthropicChatFactory, anthropicCheckInFactory, anthropicEmailClassifierFactory, anthropicFollowUpFactory, anthropicMentorChatFactory, anthropicOutreachFactory, anthropicScorerFactory, anthropicTailorFactory } from "./llm/factory";
 import { makeRenderer } from "./render/renderer";
 import { loadTruthFacts } from "./services/truth";
 import { importBasesIfMissing } from "./services/resumes";
@@ -13,6 +13,7 @@ import { fetchBoard } from "./sources/boards";
 import { startScheduler } from "./scheduler";
 import type { CheckInDeps } from "./services/checkIns";
 import type { MailDeps } from "./services/mail";
+import type { NetworkDeps } from "./services/network";
 import { imapSource } from "./mail/imap";
 import { markInterruptedRuns, rebuildTodaysShortlist, recheckBoardJobs, type PipelineDeps } from "./services/pipeline";
 
@@ -45,7 +46,9 @@ const mail: MailDeps = {
   },
   getClassifier: anthropicEmailClassifierFactory,
 };
-const app = buildApp(db, { logger: true, pipeline, prep, submit, checkIn, mail, onSettingsChanged: () => reschedule() });
+// Referral outreach: drafts only. Nothing here touches linkedin.com.
+const network: NetworkDeps = { getDrafter: anthropicOutreachFactory, facts: loadTruthFacts };
+const app = buildApp(db, { logger: true, pipeline, prep, submit, checkIn, mail, network, onSettingsChanged: () => reschedule() });
 
 // Bind to localhost only: this is a personal tool with no auth.
 await app.listen({ port: config.port, host: "127.0.0.1" });

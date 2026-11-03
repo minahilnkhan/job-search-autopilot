@@ -10,6 +10,7 @@ import { Settings } from "./pages/Settings";
 import { Review } from "./pages/Review";
 import { Resumes } from "./pages/Resumes";
 import { Applications } from "./pages/Applications";
+import { Network } from "./pages/Network";
 
 // Hash routing: a handful of pages don't need a router dependency.
 // A few places in the nav; everything else hangs off one of them.
@@ -18,10 +19,11 @@ const NAV = [
   { path: "#/progress", label: "Progress" },
   { path: "#/applications", label: "Applications" },
   { path: "#/resumes", label: "Resumes" },
+  { path: "#/network", label: "Network" },
   { path: "#/jobs", label: "Jobs" },
   { path: "#/settings", label: "Settings" },
 ] as const;
-const PAGES = ["#/today", "#/progress", "#/applications", "#/review", "#/resumes", "#/jobs", "#/add", "#/settings", "#/settings/companies"] as const;
+const PAGES = ["#/today", "#/progress", "#/applications", "#/review", "#/resumes", "#/network", "#/jobs", "#/add", "#/settings", "#/settings/companies"] as const;
 type Page = (typeof PAGES)[number];
 // Old addresses still work.
 const MOVED: Record<string, string> = { "#/tracker": "#/applications?stage=submitted", "#/settings/resumes": "#/resumes", "#/companies": "#/settings/companies" };
@@ -30,6 +32,7 @@ const SECTION: Record<Page, string> = {
   "#/progress": "#/progress",
   "#/applications": "#/applications",
   "#/resumes": "#/resumes",
+  "#/network": "#/network",
   "#/review": "#/applications",
   "#/jobs": "#/jobs",
   "#/add": "#/jobs",
@@ -134,6 +137,7 @@ export default function App() {
         {route === "#/add" && <AddJob onSaved={loadJobs} />}
         {route === "#/settings" && <Settings />}
         {route === "#/resumes" && <Resumes />}
+        {route === "#/network" && <Network />}
         {route === "#/settings/companies" && <Companies onJobsChanged={loadJobs} />}
       </main>
     </div>

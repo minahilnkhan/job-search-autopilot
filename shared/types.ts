@@ -539,9 +539,60 @@ export type InboxState = {
   /** Set when the Settings email (what forms are filled with) differs from the watched inbox. */
   fillsWithOtherAddress: string | null;
   checkAt: string;
-  lastCheck: { at: number; status: "ok" | "failed"; error: string | null; stats: { scanned: number; matched: number; suggestions: number; recorded: number; costUsd: number } | null } | null;
+  lastCheck: { at: number; status: "ok" | "failed"; error: string | null; stats: { scanned: number; matched: number; suggestions: number; recorded: number; costUsd: number; connected?: number } | null } | null;
   running: boolean;
   pending: InboxItem[];
   recent: InboxItem[];
 };
 
+
+// ---- Network: referral outreach -----------------------------------------------
+
+export const CONTACT_RELATIONSHIPS = ["first_degree", "alum", "ex_colleague", "team", "recruiter", "other"] as const;
+export type ContactRelationship = (typeof CONTACT_RELATIONSHIPS)[number];
+
+export const OUTREACH_STATUSES = ["planned", "invited", "connected", "asked", "followed_up", "replied", "referred", "declined", "no_reply"] as const;
+export type OutreachStatus = (typeof OUTREACH_STATUSES)[number];
+
+export type OutreachIssue = { field: "note" | "ask" | "followUp"; severity: "fail" | "warn"; message: string };
+
+export type OutreachItem = {
+  id: number;
+  status: OutreachStatus;
+  contact: { id: number; name: string; headline: string | null; linkedinUrl: string; relationship: ContactRelationship; about: string | null };
+  /** The role it's for; null for networking with no specific role. */
+  application: { id: number; companyName: string; jobTitle: string; tier: "A" | "B" | null; jobUrl: string } | null;
+  note: string;
+  ask: string;
+  followUp: string;
+  issues: OutreachIssue[];
+  invitedAt: number | null;
+  connectedAt: number | null;
+  connectedVia: "you" | "inbox" | null;
+  askedAt: number | null;
+  followUpDue: string | null;
+  updatedAt: number;
+  /** What to do now, or null when it's waiting on them. */
+  next: { action: "invite" | "message" | "follow_up"; label: string; text: "note" | "ask" | "followUp" } | null;
+};
+
+export type NetworkRole = {
+  applicationId: number;
+  companyName: string;
+  jobTitle: string;
+  tier: "A" | "B" | null;
+  status: ApplicationStatus;
+  wanted: number;
+  found: number;
+  searches: { label: string; why: string; url: string }[];
+};
+
+export type NetworkState = {
+  invites: { today: number; week: number; dailyCap: number; weeklyCap: number; left: number };
+  noteLimit: number;
+  /** Things to do today: sends, asks and follow-ups that are due. */
+  due: OutreachItem[];
+  outreach: OutreachItem[];
+  roles: NetworkRole[];
+  drafting: { available: boolean; reason: string | null };
+};

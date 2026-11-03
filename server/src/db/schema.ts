@@ -20,7 +20,9 @@ import type {
   RunStats,
   ScoreBreakdown,
   Settings,
+  OutreachIssue,
 } from "../../../shared/types";
+import { CONTACT_RELATIONSHIPS, OUTREACH_STATUSES } from "../../../shared/types";
 import { DEFAULT_SETTINGS } from "../domain/settingsDefaults";
 
 // Conventions:
@@ -230,7 +232,7 @@ export const mailChecks = sqliteTable("mail_checks", {
   startedAt: integer("started_at", { mode: "timestamp_ms" }).notNull(),
   finishedAt: integer("finished_at", { mode: "timestamp_ms" }),
   status: text("status", { enum: ["running", "ok", "failed"] }).notNull(),
-  stats: text("stats", { mode: "json" }).$type<{ scanned: number; matched: number; suggestions: number; recorded: number; costUsd: number }>(),
+  stats: text("stats", { mode: "json" }).$type<{ scanned: number; matched: number; suggestions: number; recorded: number; costUsd: number; connected?: number }>(),
   error: text("error"),
 });
 
@@ -366,4 +368,45 @@ export const apiUsage = sqliteTable(
     jobId: integer("job_id").references(() => jobs.id),
   },
   (t) => [index("api_usage_at_idx").on(t.at)]
+);
+
+// ---- Network: referral outreach -------------------------------------------------
+
+/** A person on LinkedIn you've picked. One row per profile, reused across roles. */
+export const contacts = sqliteTable(
+  "contacts",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    name: text("name").notNull(),
+    linkedinUrl: text("linkedin_url").notNull(), // normalized: https://www.linkedin.com/in/<slug>
+    headline: text("headline"),
+    relationship: text("relationship", { enum: CONTACT_RELATIONSHIPS }).notNull(),
+    about: text("about"), // what you know about them, in your words or pasted from their profile
+    createdAt: createdAt(),
+  },
+  (t) => [uniqueIndex("contacts_linkedin_url_idx").on(t.linkedinUrl)]
+);
+
+/** One conversation with one person, usually about one application. */
+export const outreach = sqliteTable(
+  "outreach",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    contactId: integer("contact_id").notNull().references(() => contacts.id),
+    applicationId: integer("application_id").references(() => applications.id),
+    status: text("status", { enum: OUTREACH_STATUSES }).notNull().default("planned"),
+    note: text("note").notNull().default(""), // connection note (no ask)
+    ask: text("ask").notNull().default(""), // the message after they accept
+    followUp: text("follow_up").notNull().default(""),
+    issues: text("issues", { mode: "json" }).$type<OutreachIssue[]>().notNull().default(sql`'[]'`),
+    invitedAt: integer("invited_at", { mode: "timestamp_ms" }),
+    connectedAt: integer("connected_at", { mode: "timestamp_ms" }),
+    connectedVia: text("connected_via", { enum: ["you", "inbox"] }),
+    askedAt: integer("asked_at", { mode: "timestamp_ms" }),
+    followUpDue: text("follow_up_due"),
+    endedAt: integer("ended_at", { mode: "timestamp_ms" }),
+    createdAt: createdAt(),
+    updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
+  },
+  (t) => [index("outreach_contact_idx").on(t.contactId), index("outreach_application_idx").on(t.applicationId)]
 );

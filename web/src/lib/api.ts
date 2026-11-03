@@ -5,6 +5,9 @@ import type {
   ResumeDoc,
   InboxItem,
   InboxState,
+  NetworkState,
+  OutreachItem,
+  ContactRelationship,
   RoleTag,
   BaseType,
   Company,
@@ -94,6 +97,16 @@ export const api = {
     request<{ scanned: number; matched: number; suggestions: number; recorded: number; costUsd: number; note?: string }>("POST", "/api/inbox/check", {}),
   acceptInbox: (id: number, applicationId?: number) => request<InboxItem>("POST", `/api/inbox/${id}/accept`, applicationId ? { applicationId } : {}),
   dismissInbox: (id: number) => request<{ ok: boolean }>("POST", `/api/inbox/${id}/dismiss`, {}),
+
+  // Network: referral outreach. Drafts only; you send from LinkedIn yourself.
+  network: () => request<NetworkState>("GET", "/api/network"),
+  addContact: (body: { applicationId: number | null; linkedinUrl: string; name: string; headline: string | null; relationship: ContactRelationship; about: string | null }) =>
+    request<OutreachItem>("POST", "/api/network/contacts", body),
+  redraftOutreach: (id: number) => request<OutreachItem>("POST", `/api/network/outreach/${id}/draft`, {}),
+  editOutreach: (id: number, patch: Partial<Pick<OutreachItem, "note" | "ask" | "followUp">>) => request<OutreachItem>("PATCH", `/api/network/outreach/${id}`, patch),
+  advanceOutreach: (id: number, action: "invite" | "accepted" | "message" | "follow_up" | "replied" | "referred" | "declined" | "no_reply") =>
+    request<OutreachItem>("POST", `/api/network/outreach/${id}/${action}`, {}),
+  removeOutreach: (id: number) => request<{ ok: boolean }>("DELETE", `/api/network/outreach/${id}`),
   resumeDocs: () => request<ResumeDoc[]>("GET", "/api/resumes"),
   saveResumeDoc: (key: string, text: string) => request<ResumeDoc>("PUT", `/api/resumes/${encodeURIComponent(key)}`, { text }),
   createResumeVersion: (body: { name: string; roleTag: RoleTag; from: string }) => request<ResumeDoc>("POST", "/api/resumes", body),
